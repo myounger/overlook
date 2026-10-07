@@ -105,7 +105,7 @@ func TestDiffPanelScrollLimits(t *testing.T) {
 	p := newDiffPanel(cfg.Panels.Diff)
 	p.setSize(24, 6) // 4 rows, 20 columns of text
 	p.selectTarget("k", "src/")
-	p.setDiff(st, "k", twoFileDiff, "", "", nil, true)
+	p.setDiff(st, "k", twoFileDiff, "", "", nil, true, nil)
 	p.scroll(100)
 	if p.offset != len(p.lines)-4 {
 		t.Errorf("offset %d, want %d", p.offset, len(p.lines)-4)
@@ -122,7 +122,7 @@ func TestDiffPanelScrollLimits(t *testing.T) {
 	}
 	// A result for a selection you've moved away from is dropped.
 	p.selectTarget("other", "x")
-	p.setDiff(st, "k", twoFileDiff, "", "", nil, true)
+	p.setDiff(st, "k", twoFileDiff, "", "", nil, true, nil)
 	if p.lines != nil {
 		t.Error("stale diff was shown")
 	}
@@ -164,7 +164,7 @@ func TestDiffPanelWraps(t *testing.T) {
 	p := newDiffPanel(cfg.Panels.Diff)
 	p.setSize(15, 10) // 11 columns of text
 	p.selectTarget("k", "x")
-	p.setDiff(st, "k", "@@ -1 +1 @@\n+abcdefghijklmnopqrstuvwxy\n", "", "", nil, false)
+	p.setDiff(st, "k", "@@ -1 +1 @@\n+abcdefghijklmnopqrstuvwxy\n", "", "", nil, false, nil)
 	out := p.view(st, true)
 	var got []string
 	for _, l := range strings.Split(ansi.Strip(out), "\n")[1:5] {

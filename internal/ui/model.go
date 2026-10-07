@@ -23,6 +23,7 @@ const (
 	branchesID
 	diffID
 	statusID // not focusable; has a place on screen
+	logID
 )
 
 type Model struct {
@@ -37,6 +38,8 @@ type Model struct {
 	files     filesPanel
 	branches  branchesPanel
 	diff      diffPanel
+	log       logPanel
+	diffFrom  panelID // Files or Log: whichever was focused last feeds the diff
 	worktrees worktreeSet
 	switching string // worktree path being switched to
 	pulling   bool
@@ -68,6 +71,7 @@ func New(cfg config.Config, repo git.Repo, w *watch.Watcher) Model {
 		files:     newFilesPanel(cfg.Panels.Files),
 		branches:  newBranchesPanel(cfg.Panels.Branches, repo.Root),
 		diff:      newDiffPanel(cfg.Panels.Diff),
+		log:       newLogPanel(cfg.Panels.Log),
 		worktrees: newWorktreeSet(cfg.Worktrees),
 	}
 	if shown := m.shownPanels(); len(shown) > 0 {
@@ -90,6 +94,11 @@ type (
 		branches []git.Branch
 		err      error
 	}
+	logMsg struct {
+		root    string
+		commits []git.Commit
+		err     error
+	}
 	worktreesMsg struct {
 		root     string
 		list     []git.Worktree
@@ -105,6 +114,7 @@ type (
 		raw   string
 		paged string
 		note  string
+		intro []string // shown above a commit's diff: subject, then author and date
 		multi bool
 		err   error
 	}
@@ -127,6 +137,13 @@ func (m Model) load() tea.Cmd {
 		cmds = append(cmds, func() tea.Msg {
 			b, _, err := git.ReadBranches(repo, mergedInto)
 			return branchesMsg{repo.Root, b, err}
+		})
+	}
+	if m.cfg.Panels.Log.Show {
+		count := m.cfg.Panels.Log.Count
+		cmds = append(cmds, func() tea.Msg {
+			c, err := git.ReadLog(repo, count)
+			return logMsg{repo.Root, c, err}
 		})
 	}
 	if m.worktrees.enabled() {
@@ -170,6 +187,9 @@ func (m *Model) syncDiff(reload bool) tea.Cmd {
 	if !m.cfg.Panels.Diff.Show || !m.loaded {
 		return nil
 	}
+	if m.diffFrom == logID && m.cfg.Panels.Log.Show {
+		return m.syncCommitDiff()
+	}
 	key, target, ok := m.files.selection()
 	label := ""
 	if ok {
@@ -192,6 +212,30 @@ func (m *Model) syncDiff(reload bool) tea.Cmd {
 		}
 		raw, err := git.Diff(repo, target, hasHead, pager != "")
 		msg := diffMsg{key: key, raw: raw, multi: target.Dir, err: err}
+		if err == nil && pager != "" && raw != "" {
+			msg.paged, msg.err = git.Pipe(pager, raw, width)
+			msg.raw = ansi.Strip(raw)
+		}
+		return msg
+	}
+}
+
+// syncCommitDiff points the diff at the commit selected in Log. A
+// commit's changes never change, so it only loads when the selection does.
+func (m *Model) syncCommitDiff() tea.Cmd {
+	c, ok := m.log.selected()
+	key, label := "", ""
+	if ok {
+		key, label = m.repo.Root+"\x00c:"+c.Hash, c.Short
+	}
+	if !m.diff.selectTarget(key, label) || !ok {
+		return nil
+	}
+	repo, pager, width := m.repo, m.cfg.Panels.Diff.Pager, max(m.diff.width-4, 20)
+	intro := []string{c.Subject, c.Author + " · " + c.Time.Format("Mon Jan 2 2006 15:04")}
+	return func() tea.Msg {
+		raw, err := git.CommitDiff(repo, c.Hash, pager != "")
+		msg := diffMsg{key: key, raw: raw, intro: intro, multi: true, err: err}
 		if err == nil && pager != "" && raw != "" {
 			msg.paged, msg.err = git.Pipe(pager, raw, width)
 			msg.raw = ansi.Strip(raw)
@@ -261,6 +305,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.branches.setBranches(msg.branches, msg.err)
+	case logMsg:
+		if msg.root != m.repo.Root {
+			return m, nil
+		}
+		m.log.setCommits(msg.commits, msg.err)
+		if m.diffFrom == logID {
+			return m, m.syncDiff(false)
+		}
 	case worktreesMsg:
 		if msg.err != nil || msg.root != m.repo.Root {
 			return m, nil
@@ -283,10 +335,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		files.setSize(m.files.width, m.files.height)
 		m.files = files
 		m.branches.repoRoot = msg.repo.Root
+		log := newLogPanel(m.cfg.Panels.Log)
+		log.setSize(m.log.width, m.log.height)
+		m.log = log
 		m.diff.selectTarget("", "")
 		return m, m.load()
 	case diffMsg:
-		m.diff.setDiff(m.st, msg.key, msg.raw, msg.paged, msg.note, msg.err, msg.multi)
+		m.diff.setDiff(m.st, msg.key, msg.raw, msg.paged, msg.note, msg.err, msg.multi, msg.intro)
 	case pullDoneMsg:
 		return m, m.finishPull(msg)
 	case clearMessageMsg:
@@ -328,6 +383,9 @@ func (m Model) View() tea.View {
 // expanded one; focusing the diff leaves the layout as it was.
 func (m *Model) setFocus(id panelID) {
 	m.focus = id
+	if id == filesID || id == logID {
+		m.diffFrom = id
+	}
 	if isList(id) && id != m.lastList {
 		m.lastList = id
 		if m.cfg.Layout.ExpandFocused {

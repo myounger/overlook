@@ -39,6 +39,7 @@ type styles struct {
 	diffDelete    lipgloss.Style
 	diffHunk      lipgloss.Style
 	diffFile      lipgloss.Style
+	hash          lipgloss.Style
 }
 
 func newStyles(t config.Theme) styles {
@@ -73,6 +74,7 @@ func newStyles(t config.Theme) styles {
 		diffDelete:    fg(t.DiffDelete),
 		diffHunk:      fg(t.DiffHunk),
 		diffFile:      fg(t.DiffFile).Bold(true),
+		hash:          fg(t.Hash),
 	}
 }
 

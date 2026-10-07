@@ -70,7 +70,7 @@ func (p *diffPanel) selectTarget(key, path string) bool {
 
 // setDiff shows a loaded diff. paged is the pager's output, if one is set;
 // a note replaces the diff with a message.
-func (p *diffPanel) setDiff(st styles, key, raw, paged, note string, err error, multiFile bool) {
+func (p *diffPanel) setDiff(st styles, key, raw, paged, note string, err error, multiFile bool, intro []string) {
 	if key != p.key {
 		return
 	}
@@ -89,9 +89,17 @@ func (p *diffPanel) setDiff(st styles, key, raw, paged, note string, err error, 
 	if p.cfg.Pager != "" {
 		lines = pagedLines(paged, p.cfg.MaxLines)
 	}
+	if len(intro) > 0 {
+		// A commit's subject and author come first, then its changes.
+		head := []diffLine{{style: lipgloss.NewStyle().Bold(true), text: intro[0]}}
+		for _, l := range intro[1:] {
+			head = append(head, diffLine{style: st.muted, text: l})
+		}
+		lines = append(append(head, diffLine{}), lines...)
+	}
 	p.setLines(lines)
 	p.raw, p.adds, p.dels, p.note = raw, adds, dels, ""
-	if len(lines) == 0 {
+	if raw == "" {
 		p.note = "No changes"
 	}
 }

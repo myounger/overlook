@@ -38,6 +38,7 @@ theme:
   diffDelete: "1"      # removed lines
   diffHunk: "6"        # the line introducing each block of changes
   diffFile: "4"        # file names between files in a folder's diff (always bold)
+  hash: "3"            # commit hashes in the Log panel
   tab: "8"             # the other worktree tabs
 
 panels:
@@ -81,6 +82,14 @@ panels:
     # as "delta --paging=never". It reads the diff on stdin, gets the
     # panel's width in $COLUMNS, and shouldn't page.
     pager: ""
+  # Recent commits on the current branch. Selecting one shows its changes
+  # in the Diff panel; the diff follows whichever of Files and Log you were
+  # in last. ↑ marks commits not pushed to the upstream yet.
+  log:
+    show: false
+    size: 1
+    count: 50          # how many commits to list
+    age: true          # how long ago each commit was made
 
 # Overlook shows one working tree at a time: the main folder or one of its
 # linked worktrees (like the ones Claude Code creates).
@@ -106,9 +115,9 @@ pull:
 
 layout:
   # Top to bottom under Status, which is also the Tab order. Any panel left
-  # out goes after the ones listed. When the diff sits on the right, it
+  # out goes after the ones listed. Hidden panels are skipped. When the diff sits on the right, it
   # keeps its place in the Tab order.
-  order: [files, diff, branches]
+  order: [files, diff, branches, log]
   # Files and Branches take turns: the one you're in (or were last in) gets
   # the room, and the other shrinks to collapsedRows rows. The diff keeps
   # its size so you can still read it while moving through Files.

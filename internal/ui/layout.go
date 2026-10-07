@@ -110,7 +110,7 @@ func (m Model) expandedList(stack []panelID) panelID {
 	return m.lastList
 }
 
-func isList(id panelID) bool { return id == filesID || id == branchesID }
+func isList(id panelID) bool { return id == filesID || id == branchesID || id == logID }
 
 // place records where a panel goes and sizes it to fit.
 func (m *Model) place(id panelID, r rect) {
@@ -133,6 +133,8 @@ func (m Model) panelSize(id panelID) int {
 		return m.cfg.Panels.Files.Size
 	case branchesID:
 		return m.cfg.Panels.Branches.Size
+	case logID:
+		return m.cfg.Panels.Log.Size
 	default:
 		return m.cfg.Panels.Diff.Size
 	}
@@ -146,6 +148,8 @@ func (m *Model) sizePanel(id panelID, w, h int) {
 		m.branches.setSize(w, h)
 	case diffID:
 		m.diff.setSize(w, h)
+	case logID:
+		m.log.setSize(w, h)
 	}
 }
 
@@ -160,6 +164,8 @@ func (m Model) panelView(id panelID) string {
 		view, w, h = m.branches.view(m.st, active, time.Now()), m.branches.width, m.branches.height
 	case diffID:
 		view, w, h = m.diff.view(m.st, active), m.diff.width, m.diff.height
+	case logID:
+		view, w, h = m.log.view(m.st, active, time.Now()), m.log.width, m.log.height
 	}
 	if view == "" {
 		return blank(w, h) // too small to draw a border
@@ -258,6 +264,10 @@ func (m Model) footer() string {
 			action = "fold/diff"
 		}
 		hints = append(hints, hint{first(k.ToggleFolder), action}, hint{first(k.ToggleView), otherView})
+	case logID:
+		if m.cfg.Panels.Diff.Show {
+			hints = append(hints, hint{first(k.ToggleFolder), "diff"})
+		}
 	case diffID:
 		if !m.diff.wraps() {
 			hints = append(hints, hint{pair(k.ScrollLeft, k.ScrollRight), "scroll"})

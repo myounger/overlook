@@ -49,7 +49,7 @@ func TestLoadRejectsBadChoices(t *testing.T) {
 }
 
 func TestLoadRejectsBadOrder(t *testing.T) {
-	for _, order := range []string{"[files, diff, files]", "[files, log]"} {
+	for _, order := range []string{"[files, diff, files]", "[files, graph]"} {
 		path := filepath.Join(t.TempDir(), "config.yml")
 		os.WriteFile(path, []byte("layout:\n  order: "+order+"\n"), 0o644)
 		if _, err := Load(path); err == nil {
