@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/myounger/overlook/internal/config"
@@ -48,12 +47,5 @@ func upstreamLabel(st styles, s git.Status) string {
 	if s.Ahead == 0 && s.Behind == 0 {
 		return st.inSync.Render("✓")
 	}
-	var counts []string
-	if s.Ahead > 0 {
-		counts = append(counts, fmt.Sprintf("↑%d", s.Ahead))
-	}
-	if s.Behind > 0 {
-		counts = append(counts, fmt.Sprintf("↓%d", s.Behind))
-	}
-	return st.upstream.Render(strings.Join(counts, " "))
+	return st.upstream.Render(aheadBehind(s.Ahead, s.Behind))
 }

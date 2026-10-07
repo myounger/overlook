@@ -29,29 +29,33 @@ type Config struct {
 }
 
 type Theme struct {
-	Border       string `yaml:"border"`
-	ActiveBorder string `yaml:"activeBorder"`
-	Title        string `yaml:"title"`
-	Repo         string `yaml:"repo"`
-	Branch       string `yaml:"branch"`
-	Worktree     string `yaml:"worktree"`
-	Upstream     string `yaml:"upstream"`
-	InSync       string `yaml:"inSync"`
-	Muted        string `yaml:"muted"`
-	SelectedBg   string `yaml:"selectedBg"`
-	Folder       string `yaml:"folder"`
-	Staged       string `yaml:"staged"`
-	Unstaged     string `yaml:"unstaged"`
-	Added        string `yaml:"added"`
-	Modified     string `yaml:"modified"`
-	Deleted      string `yaml:"deleted"`
-	Renamed      string `yaml:"renamed"`
-	Conflicted   string `yaml:"conflicted"`
+	Border        string `yaml:"border"`
+	ActiveBorder  string `yaml:"activeBorder"`
+	Title         string `yaml:"title"`
+	Repo          string `yaml:"repo"`
+	Branch        string `yaml:"branch"`
+	Worktree      string `yaml:"worktree"`
+	Upstream      string `yaml:"upstream"`
+	InSync        string `yaml:"inSync"`
+	Muted         string `yaml:"muted"`
+	SelectedBg    string `yaml:"selectedBg"`
+	Folder        string `yaml:"folder"`
+	Staged        string `yaml:"staged"`
+	Unstaged      string `yaml:"unstaged"`
+	Added         string `yaml:"added"`
+	Modified      string `yaml:"modified"`
+	Deleted       string `yaml:"deleted"`
+	Renamed       string `yaml:"renamed"`
+	Conflicted    string `yaml:"conflicted"`
+	CurrentBranch string `yaml:"currentBranch"`
+	Gone          string `yaml:"gone"`
+	Merged        string `yaml:"merged"`
 }
 
 type Panels struct {
-	Status StatusPanel `yaml:"status"`
-	Files  FilesPanel  `yaml:"files"`
+	Status   StatusPanel   `yaml:"status"`
+	Files    FilesPanel    `yaml:"files"`
+	Branches BranchesPanel `yaml:"branches"`
 }
 
 type StatusPanel struct {
@@ -65,6 +69,17 @@ type FilesPanel struct {
 	View           string `yaml:"view"`
 	CompactFolders bool   `yaml:"compactFolders"`
 	Untracked      string `yaml:"untracked"`
+	Size           int    `yaml:"size"`
+}
+
+type BranchesPanel struct {
+	Show       bool   `yaml:"show"`
+	Size       int    `yaml:"size"`
+	Sort       string `yaml:"sort"`
+	Age        bool   `yaml:"age"`
+	Upstream   bool   `yaml:"upstream"`
+	Worktree   bool   `yaml:"worktree"`
+	MergedInto string `yaml:"mergedInto"`
 }
 
 type Layout struct {
@@ -89,6 +104,8 @@ type Keys struct {
 	FoldAll      []string `yaml:"foldAll"`
 	UnfoldAll    []string `yaml:"unfoldAll"`
 	ToggleView   []string `yaml:"toggleView"`
+	NextPanel    []string `yaml:"nextPanel"`
+	PrevPanel    []string `yaml:"prevPanel"`
 }
 
 // Path returns the config file location: $XDG_CONFIG_HOME/overlook/config.yml,
@@ -134,9 +151,18 @@ func (c Config) validate() error {
 		}
 		return fmt.Errorf("%s is %q; use one of: %s", field, value, strings.Join(allowed, ", "))
 	}
+	atLeast1 := func(field string, n int) error {
+		if n >= 1 {
+			return nil
+		}
+		return fmt.Errorf("%s is %d; use 1 or more", field, n)
+	}
 	return errors.Join(
 		oneOf("panels.files.view", c.Panels.Files.View, "tree", "flat"),
 		oneOf("panels.files.untracked", c.Panels.Files.Untracked, "all", "folders", "none"),
+		oneOf("panels.branches.sort", c.Panels.Branches.Sort, "recent", "name"),
+		atLeast1("panels.files.size", c.Panels.Files.Size),
+		atLeast1("panels.branches.size", c.Panels.Branches.Size),
 	)
 }
 

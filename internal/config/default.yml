@@ -26,6 +26,9 @@ theme:
   deleted: "1"         # names of deleted files
   renamed: "6"         # names of renamed or copied files
   conflicted: "5"      # names of files with merge conflicts
+  currentBranch: "2"   # the branch you're on, in the Branches panel
+  gone: "1"            # "gone": the branch's remote branch was deleted
+  merged: "6"          # "merged": everything on the branch is in the base branch
 
 panels:
   status:
@@ -37,6 +40,19 @@ panels:
     view: tree         # tree or flat (full paths)
     compactFolders: true  # show a folder chain with one child as "internal/ui"
     untracked: all     # all (every new file), folders (a new folder is one entry), or none
+    size: 2            # share of the height, compared to the other list panels
+  branches:
+    show: true
+    size: 1
+    sort: recent       # recent (newest commit first) or name; the current branch is always on top
+    age: true          # how long ago each branch's last commit was
+    upstream: true     # ahead/behind, or "gone" when the remote branch was deleted
+    worktree: true     # which worktree a branch is checked out in
+    # Branches fully contained in this one are marked "merged", a hint that
+    # they can be deleted. Empty means origin's default branch (origin/HEAD),
+    # else main or master. Squash-merged PRs don't count as merged; they show
+    # as "gone" once you fetch with --prune and the remote branch is deleted.
+    mergedInto: ""
 
 layout:
   footer: true         # key hints along the bottom
@@ -62,3 +78,5 @@ keys:
   foldAll: ["-"]
   unfoldAll: ["="]
   toggleView: ["`"]    # switch the Files panel between tree and flat
+  nextPanel: [tab]
+  prevPanel: [shift+tab]

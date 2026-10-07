@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"image/color"
 	"strings"
 
 	"charm.land/lipgloss/v2"
@@ -43,4 +44,34 @@ func renderPanel(st styles, title, body string, width, height int, active bool) 
 		Render(strings.Join(lines, "\n"))
 
 	return top + "\n" + box
+}
+
+// withBg returns a function that adds bg to a style. A selected row applies
+// it to every piece so the highlight runs edge to edge; one outer style
+// can't, because each inner color code resets the background.
+func withBg(bg color.Color) func(lipgloss.Style) lipgloss.Style {
+	return func(s lipgloss.Style) lipgloss.Style {
+		if bg != nil {
+			return s.Background(bg)
+		}
+		return s
+	}
+}
+
+// fitRow cuts or pads a styled line to exactly w cells; padding uses fill.
+func fitRow(line string, w int, fill lipgloss.Style) string {
+	line = ansi.Truncate(line, w, "")
+	if pad := w - lipgloss.Width(line); pad > 0 {
+		line += fill.Render(strings.Repeat(" ", pad))
+	}
+	return line
+}
+
+// truncateLeft shortens plain text to w cells by cutting from the left, so
+// the end (a file name, a branch's last segment) stays readable.
+func truncateLeft(s string, w int) string {
+	if n := lipgloss.Width(s); w > 0 && n > w {
+		return ansi.TruncateLeft(s, n-w+1, "…")
+	}
+	return s
 }

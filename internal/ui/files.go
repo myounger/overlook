@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"charm.land/lipgloss/v2"
-	"github.com/charmbracelet/x/ansi"
 
 	"github.com/myounger/overlook/internal/config"
 	"github.com/myounger/overlook/internal/git"
@@ -21,10 +20,7 @@ type filesPanel struct {
 	rows      []row
 	collapsed map[string]bool
 	flat      bool
-	cursor    int
-	offset    int // first visible row
-	width     int
-	height    int
+	listView
 }
 
 func newFilesPanel(cfg config.FilesPanel) filesPanel {
@@ -46,14 +42,17 @@ func (p *filesPanel) rebuild() {
 	} else {
 		p.rows = treeRows(p.root, p.collapsed)
 	}
-	p.cursor = min(p.cursor, max(len(p.rows)-1, 0))
+	p.setCount(len(p.rows))
+	p.selectKey(selected)
+}
+
+func (p *filesPanel) selectKey(key string) {
 	for i, r := range p.rows {
-		if r.node.key() == selected {
-			p.cursor = i
-			break
+		if r.node.key() == key {
+			p.setCursor(i)
+			return
 		}
 	}
-	p.scroll()
 }
 
 func (p *filesPanel) selectedKey() string {
@@ -61,27 +60,6 @@ func (p *filesPanel) selectedKey() string {
 		return p.rows[p.cursor].node.key()
 	}
 	return ""
-}
-
-func (p *filesPanel) setSize(width, height int) {
-	p.width, p.height = width, height
-	p.scroll()
-}
-
-// pageSize is how many rows fit inside the border.
-func (p *filesPanel) pageSize() int { return max(p.height-2, 1) }
-
-func (p *filesPanel) move(delta int) {
-	p.cursor = max(min(p.cursor+delta, len(p.rows)-1), 0)
-	p.scroll()
-}
-
-// scroll moves the window just enough to keep the cursor in view.
-func (p *filesPanel) scroll() {
-	h := p.pageSize()
-	p.offset = min(p.offset, p.cursor)
-	p.offset = max(p.offset, p.cursor-h+1)
-	p.offset = max(min(p.offset, len(p.rows)-h), 0)
 }
 
 // toggleFolder folds or unfolds the folder under the cursor.
@@ -114,11 +92,8 @@ func (p *filesPanel) setAllFolded(folded bool) {
 		}
 	}
 	p.rebuild()
-	for i, r := range p.rows {
-		if r.node.key() == top {
-			p.cursor = i
-			p.scroll()
-		}
+	if top != "" {
+		p.selectKey(top)
 	}
 }
 
@@ -140,9 +115,9 @@ func (p *filesPanel) view(st styles, active bool) string {
 	if len(p.rows) == 0 || textW < 1 {
 		return renderPanel(st, p.title(), st.muted.Render("No changes"), p.width, p.height, active)
 	}
-	end := min(p.offset+p.pageSize(), len(p.rows))
-	lines := make([]string, 0, end-p.offset)
-	for i := p.offset; i < end; i++ {
+	start, end := p.visible()
+	lines := make([]string, 0, end-start)
+	for i := start; i < end; i++ {
 		var bg color.Color
 		if active && i == p.cursor {
 			bg = st.selectedBg
@@ -152,16 +127,9 @@ func (p *filesPanel) view(st styles, active bool) string {
 	return renderPanel(st, p.title(), strings.Join(lines, "\n"), p.width, p.height, active)
 }
 
-// renderRow draws one row exactly textW cells wide. Every piece gets the
-// background so a selected row is highlighted edge to edge; an outer style
-// can't do that because each inner color code resets the background.
+// renderRow draws one row exactly textW cells wide.
 func (p *filesPanel) renderRow(st styles, r row, textW int, bg color.Color) string {
-	on := func(s lipgloss.Style) lipgloss.Style {
-		if bg != nil {
-			return s.Background(bg)
-		}
-		return s
-	}
+	on := withBg(bg)
 	plain := on(lipgloss.NewStyle())
 	n := r.node
 	indent := strings.Repeat("  ", r.depth)
@@ -195,16 +163,8 @@ func (p *filesPanel) renderRow(st styles, r row, textW int, bg color.Color) stri
 	}
 
 	// Cut long names from the left so the file name and extension stay.
-	avail := textW - prefixW - lipgloss.Width(suffix)
-	if w := lipgloss.Width(name); avail > 0 && w > avail {
-		name = ansi.TruncateLeft(name, w-avail+1, "…")
-	}
-	line := prefix + on(nameStyle).Render(name) + suffix
-	line = ansi.Truncate(line, textW, "")
-	if pad := textW - lipgloss.Width(line); pad > 0 {
-		line += plain.Render(strings.Repeat(" ", pad))
-	}
-	return line
+	name = truncateLeft(name, textW-prefixW-lipgloss.Width(suffix))
+	return fitRow(prefix+on(nameStyle).Render(name)+suffix, textW, plain)
 }
 
 // statusChar shows git's "." (unchanged) as a blank, like lazygit.

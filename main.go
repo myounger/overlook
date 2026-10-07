@@ -66,11 +66,11 @@ func run() error {
 		return err
 	}
 
-	// HEAD lives in this worktree's git dir; branch and remote refs live in
-	// the shared one.
+	// HEAD lives in this worktree's git dir; branch and remote refs, and the
+	// list of linked worktrees, live in the shared one.
 	w, err := watch.New(
 		[]string{repo.GitDir, repo.CommonDir},
-		[]string{filepath.Join(repo.CommonDir, "refs")},
+		[]string{filepath.Join(repo.CommonDir, "refs"), filepath.Join(repo.CommonDir, "worktrees")},
 		cfg.Refresh.Debounce,
 	)
 	if err != nil {
