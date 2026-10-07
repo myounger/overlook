@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"time"
 
 	"github.com/fsnotify/fsnotify"
@@ -17,7 +18,7 @@ type Watcher struct {
 	Changes chan struct{}
 
 	fs       *fsnotify.Watcher
-	debounce time.Duration
+	debounce atomic.Int64 // a time.Duration; changes when the config is reloaded
 	trees    []string
 }
 
@@ -28,7 +29,8 @@ func New(dirs, trees []string, debounce time.Duration) (*Watcher, error) {
 	if err != nil {
 		return nil, err
 	}
-	w := &Watcher{Changes: make(chan struct{}, 1), fs: fw, debounce: debounce, trees: trees}
+	w := &Watcher{Changes: make(chan struct{}, 1), fs: fw, trees: trees}
+	w.SetDebounce(debounce)
 	for _, d := range dirs {
 		if err := fw.Add(d); err != nil {
 			fw.Close()
@@ -43,6 +45,10 @@ func New(dirs, trees []string, debounce time.Duration) (*Watcher, error) {
 }
 
 func (w *Watcher) Close() error { return w.fs.Close() }
+
+// SetDebounce changes how long a burst of events must go quiet before a
+// signal is sent.
+func (w *Watcher) SetDebounce(d time.Duration) { w.debounce.Store(int64(d)) }
 
 // addTree is best effort: folders that vanish or can't be read are skipped.
 func (w *Watcher) addTree(root string) {
@@ -77,7 +83,7 @@ func (w *Watcher) loop() {
 					w.addTree(ev.Name)
 				}
 			}
-			timer.Reset(w.debounce)
+			timer.Reset(time.Duration(w.debounce.Load()))
 		case _, ok := <-w.fs.Errors:
 			if !ok {
 				return

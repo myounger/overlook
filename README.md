@@ -25,7 +25,9 @@ Run `overlook` inside any repo, or `overlook path/to/repo`. Press `r` to refresh
 
 ## Configuration
 
-`overlook --default-config` prints every setting with comments. Save it to `~/.config/overlook/config.yml` and edit it. Settings you leave out keep their defaults, and a misspelled key is reported as an error.
+`overlook --default-config` prints every setting with comments. Save it to `~/.config/overlook/config.yml` and edit it. Settings you leave out keep their defaults, and a misspelled key is reported as an error. Changes apply as soon as you save, without restarting; if the file has a mistake, Overlook says so and keeps the old settings.
+
+The mouse works too: the wheel scrolls the panel under the pointer, clicking selects (click again to fold a folder or open a diff), and clicking a worktree tab switches to it. Hold Shift (Option in iTerm2) to select text. Set `layout.mouse: false` to turn it off.
 
 ## Planned stack
 

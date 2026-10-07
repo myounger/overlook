@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -118,9 +119,12 @@ type Pull struct {
 }
 
 type Layout struct {
-	Order       []string      `yaml:"order"`
-	Footer      bool          `yaml:"footer"`
-	MessageTime time.Duration `yaml:"messageTime"`
+	Order         []string      `yaml:"order"`
+	ExpandFocused bool          `yaml:"expandFocused"`
+	CollapsedRows int           `yaml:"collapsedRows"`
+	Footer        bool          `yaml:"footer"`
+	Mouse         bool          `yaml:"mouse"`
+	MessageTime   time.Duration `yaml:"messageTime"`
 }
 
 // PanelNames are the panels layout.order can arrange, in default order.
@@ -219,6 +223,7 @@ func (c Config) validate() error {
 		oneOf("panels.files.untracked", c.Panels.Files.Untracked, "all", "folders", "none"),
 		oneOf("panels.branches.sort", c.Panels.Branches.Sort, "recent", "name"),
 		atLeast1("panels.files.size", c.Panels.Files.Size),
+		between("layout.collapsedRows", c.Layout.CollapsedRows, 1, 50),
 		atLeast1("panels.branches.size", c.Panels.Branches.Size),
 		oneOf("panels.diff.position", c.Panels.Diff.Position, "auto", "right", "bottom"),
 		oneOf("panels.diff.hunkHeaders", c.Panels.Diff.HunkHeaders, "lines", "git"),
@@ -234,7 +239,32 @@ func decode(data []byte, cfg *Config) error {
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
 	if err := dec.Decode(cfg); err != nil && !errors.Is(err, io.EOF) {
-		return err
+		return plainYAMLError(err)
 	}
 	return nil
+}
+
+var (
+	unknownField = regexp.MustCompile(`field (\S+) not found in type \S+`)
+	cannotDecode = regexp.MustCompile(`cannot unmarshal !!\w+ ` + "`" + `([^` + "`" + `]*)` + "`" + ` into \S+`)
+)
+
+// plainYAMLError rewords the YAML library's errors for people: it drops
+// the "yaml: unmarshal errors:" lead-in and Go type names, and puts the
+// line number first, since that's what you need to find the mistake.
+//
+//	line 3: field veiw not found in type config.FilesPanel
+//	→ line 3: unknown setting "veiw"
+func plainYAMLError(err error) error {
+	var te *yaml.TypeError
+	if !errors.As(err, &te) {
+		return errors.New(strings.TrimPrefix(err.Error(), "yaml: "))
+	}
+	msgs := make([]string, len(te.Errors))
+	for i, e := range te.Errors {
+		e = unknownField.ReplaceAllString(e, `unknown setting "$1"`)
+		e = cannotDecode.ReplaceAllString(e, `"$1" is the wrong kind of value here`)
+		msgs[i] = e
+	}
+	return errors.New(strings.Join(msgs, "; "))
 }

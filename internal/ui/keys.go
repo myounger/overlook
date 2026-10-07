@@ -44,7 +44,7 @@ func (m Model) handleKey(key string) (tea.Model, tea.Cmd) {
 			m.zoomed = false
 			m.layout()
 		case m.focus == diffID && m.cfg.Panels.Files.Show:
-			m.focus = filesID
+			m.setFocus(filesID)
 		}
 		return m, nil
 	}
@@ -62,7 +62,7 @@ func (m Model) handleKey(key string) (tea.Model, tea.Cmd) {
 		case is(k.ToggleFolder):
 			if m.files.cursor < len(m.files.rows) && !m.files.rows[m.files.cursor].node.isDir() {
 				if m.cfg.Panels.Diff.Show {
-					m.focus = diffID
+					m.setFocus(diffID)
 				}
 			} else {
 				m.files.toggleFolder()
@@ -148,7 +148,7 @@ func (m *Model) cycleFocus(step int) {
 		return
 	}
 	i := slices.Index(shown, m.focus)
-	m.focus = shown[(i+step+len(shown))%len(shown)]
+	m.setFocus(shown[(i+step+len(shown))%len(shown)])
 	if m.zoomed {
 		m.layout()
 	}

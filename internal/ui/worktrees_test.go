@@ -119,3 +119,15 @@ func TestWorktreeTabsKeepActiveVisible(t *testing.T) {
 		t.Errorf("narrow: active tab not visible or no scroll marker: %q", plain)
 	}
 }
+
+func TestTabAt(t *testing.T) {
+	cfg, _ := config.Load("")
+	s := newWorktreeSet(cfg.Worktrees)
+	s.update(trees("/code/app", "/wt/fix", "/wt/claude"), nil, "/code/app")
+	// " app " at 0-4, gap at 5, " fix " at 6-10, gap, " claude " at 12-19.
+	for x, want := range map[int]string{0: "/code/app", 4: "/code/app", 5: "", 6: "/wt/fix", 12: "/wt/claude", 19: "/wt/claude", 20: ""} {
+		if got := s.tabAt("app", "/code/app", 80, x); got != want {
+			t.Errorf("x=%d: got %q, want %q", x, got, want)
+		}
+	}
+}

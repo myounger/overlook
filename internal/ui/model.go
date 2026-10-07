@@ -22,6 +22,7 @@ const (
 	filesID panelID = iota
 	branchesID
 	diffID
+	statusID // not focusable; has a place on screen
 )
 
 type Model struct {
@@ -40,9 +41,16 @@ type Model struct {
 	switching string // worktree path being switched to
 	pulling   bool
 	msg       message
+	pollGen   int // bumped when the poll interval changes, retiring the old timer
+
+	configPath    string
+	configWatcher *watch.Watcher
+	configSum     [32]byte // of the config file as last read
 
 	focus     panelID
-	zoomed    bool // the focused panel fills the window
+	lastList  panelID // the list panel last focused, which stays expanded
+	zoomed    bool    // the focused panel fills the window
+	rects     map[panelID]rect
 	diffRight bool // the diff sits right of the other panels instead of below
 	width     int
 	height    int
@@ -60,7 +68,7 @@ func New(cfg config.Config, repo git.Repo, w *watch.Watcher) Model {
 		worktrees: newWorktreeSet(cfg.Worktrees),
 	}
 	if shown := m.shownPanels(); len(shown) > 0 {
-		m.focus = shown[0]
+		m.setFocus(shown[0])
 	}
 	return m
 }
@@ -98,11 +106,11 @@ type (
 		err   error
 	}
 	changedMsg struct{}
-	pollMsg    struct{}
+	pollMsg    struct{ gen int }
 )
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.load(), m.waitForChange(), m.poll())
+	return tea.Batch(m.load(), m.waitForChange(), m.poll(), m.waitForConfig())
 }
 
 func (m Model) load() tea.Cmd {
@@ -215,7 +223,8 @@ func (m Model) poll() tea.Cmd {
 	if m.cfg.Refresh.Poll <= 0 {
 		return nil
 	}
-	return tea.Tick(m.cfg.Refresh.Poll, func(time.Time) tea.Msg { return pollMsg{} })
+	gen := m.pollGen
+	return tea.Tick(m.cfg.Refresh.Poll, func(time.Time) tea.Msg { return pollMsg{gen} })
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -228,6 +237,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case tea.KeyPressMsg:
 		return m.handleKey(msg.String())
+	case tea.MouseMsg:
+		return m.handleMouse(msg)
 	case tea.FocusMsg:
 		return m, m.load()
 	case statusMsg:
@@ -281,7 +292,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case changedMsg:
 		return m, tea.Batch(m.load(), m.waitForChange())
 	case pollMsg:
+		if msg.gen != m.pollGen {
+			return m, nil
+		}
 		return m, tea.Batch(m.load(), m.poll())
+	case configChangedMsg:
+		return m, tea.Batch(m.reloadConfig(), m.waitForConfig())
 	}
 	return m, nil
 }
@@ -290,9 +306,24 @@ func (m Model) View() tea.View {
 	v := tea.NewView(m.render())
 	v.AltScreen = true
 	v.ReportFocus = true
+	if m.cfg.Layout.Mouse {
+		v.MouseMode = tea.MouseModeCellMotion
+	}
 	v.WindowTitle = "overlook · " + m.repo.Name()
 	if m.repo.IsWorktree() {
 		v.WindowTitle += " ⎇ " + m.repo.WorktreeName()
 	}
 	return v
+}
+
+// setFocus moves focus to a panel. Focusing Files or Branches makes it the
+// expanded one; focusing the diff leaves the layout as it was.
+func (m *Model) setFocus(id panelID) {
+	m.focus = id
+	if isList(id) && id != m.lastList {
+		m.lastList = id
+		if m.cfg.Layout.ExpandFocused {
+			m.layout()
+		}
+	}
 }

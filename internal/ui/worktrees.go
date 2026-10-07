@@ -111,41 +111,80 @@ func (s *worktreeSet) showTabs() bool {
 	return s.cfg.Tabs && len(s.trees) > 1
 }
 
-// view draws one tab per worktree, scrolled so the active tab is visible.
-func (s *worktreeSet) view(st styles, repoName, active string, width int) string {
-	labels := make([]string, len(s.trees))
+// tab is one worktree tab as placed on the tab row.
+type tab struct {
+	path   string
+	label  string
+	x      int
+	active bool
+}
+
+// tabs places one tab per worktree, scrolled so the active one is visible.
+// scrolled reports whether tabs are hidden off the left edge, which a "‹"
+// marker in the first cell shows.
+func (s *worktreeSet) tabs(repoName, active string, width int) (tabs []tab, scrolled bool) {
+	all := make([]tab, len(s.trees))
 	activeIdx := 0
 	for i, w := range s.trees {
 		label := w.Name(repoName)
 		if act, ok := s.activity[w.Path]; ok && s.cfg.Counts && act.Changed > 0 {
 			label += fmt.Sprintf(" %d", act.Changed)
 		}
-		labels[i] = " " + label + " "
-		if w.Path == active {
+		all[i] = tab{path: w.Path, label: " " + label + " ", active: w.Path == active}
+		if all[i].active {
 			activeIdx = i
 		}
 	}
 
 	// Start far enough right that everything up to the active tab fits.
-	start, used := activeIdx, lipgloss.Width(labels[activeIdx])
-	for start > 0 && used+1+lipgloss.Width(labels[start-1])+2 <= width {
+	start, used := activeIdx, lipgloss.Width(all[activeIdx].label)
+	for start > 0 && used+1+lipgloss.Width(all[start-1].label)+2 <= width {
 		start--
-		used += 1 + lipgloss.Width(labels[start])
+		used += 1 + lipgloss.Width(all[start].label)
 	}
+	scrolled = start > 0
+	x := 0
+	if scrolled {
+		x = 2 // "‹ "
+	}
+	for _, t := range all[start:] {
+		if x >= width {
+			break
+		}
+		t.x = x
+		tabs = append(tabs, t)
+		x += lipgloss.Width(t.label) + 1
+	}
+	return tabs, scrolled
+}
 
+// view draws the tab row.
+func (s *worktreeSet) view(st styles, repoName, active string, width int) string {
+	tabs, scrolled := s.tabs(repoName, active, width)
 	var b strings.Builder
-	if start > 0 {
-		b.WriteString(st.muted.Render("‹"))
+	if scrolled {
+		b.WriteString(st.muted.Render("‹") + " ")
 	}
-	for i := start; i < len(labels); i++ {
-		if i > start || start > 0 {
+	for i, t := range tabs {
+		if i > 0 {
 			b.WriteString(" ")
 		}
 		style := st.tab
-		if i == activeIdx {
+		if t.active {
 			style = st.activeTab
 		}
-		b.WriteString(style.Render(labels[i]))
+		b.WriteString(style.Render(t.label))
 	}
 	return ansi.Truncate(b.String(), width, "›")
+}
+
+// tabAt returns the worktree whose tab is at column x, or "".
+func (s *worktreeSet) tabAt(repoName, active string, width, x int) string {
+	tabs, _ := s.tabs(repoName, active, width)
+	for _, t := range tabs {
+		if x >= t.x && x < t.x+lipgloss.Width(t.label) {
+			return t.path
+		}
+	}
+	return ""
 }

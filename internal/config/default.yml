@@ -2,7 +2,9 @@
 #
 # Print this file with `overlook --default-config`, save it to
 # ~/.config/overlook/config.yml, and change what you like. Any setting you
-# leave out keeps the default shown here.
+# leave out keeps the default shown here. Overlook picks up changes as soon
+# as you save; if the file has a mistake, it says so and keeps the old
+# settings.
 
 # Colors take an ANSI color number ("0"-"255") or a hex value ("#7aa2f7").
 # ANSI numbers 0-15 follow your terminal's theme. An empty string ("") means
@@ -102,7 +104,16 @@ layout:
   # out goes after the ones listed. When the diff sits on the right, it
   # keeps its place in the Tab order.
   order: [files, diff, branches]
+  # Files and Branches take turns: the one you're in (or were last in) gets
+  # the room, and the other shrinks to collapsedRows rows. The diff keeps
+  # its size so you can still read it while moving through Files.
+  expandFocused: true
+  collapsedRows: 3
   footer: true         # key hints along the bottom; also where messages appear
+  # Scroll the panel under the pointer, click a row to select it (click it
+  # again to fold a folder or open a file's diff), click a worktree tab to
+  # switch. While it's on, hold Shift (Option in iTerm2) to select text.
+  mouse: true
   messageTime: 4s      # how long a message like "Pulled 3 commits" stays; errors stay until a key press
 
 refresh:
