@@ -2,7 +2,7 @@ BIN := overlook
 PREFIX ?= $(HOME)/.local/bin
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 
-.PHONY: build install run test
+.PHONY: build install run test release-snapshot
 
 build:
 	go build -ldflags "-X main.version=$(VERSION)" -o $(BIN) .
@@ -20,3 +20,7 @@ run: build
 test:
 	go vet ./...
 	go test ./...
+
+# Build every release platform into dist/ without publishing anything.
+release-snapshot:
+	go run github.com/goreleaser/goreleaser/v2@v2.18.2 release --snapshot --clean

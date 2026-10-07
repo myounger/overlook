@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -96,6 +97,9 @@ func TestPullRefusesOverLocalChanges(t *testing.T) {
 // without a terminal this passes either way; run them from a terminal to
 // make it meaningful.)
 func TestPullCantReachTerminal(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("uses a shell script as the fake ssh")
+	}
 	mine, _, sh := pullSetup(t)
 	report := filepath.Join(t.TempDir(), "tty")
 	fakeSSH := filepath.Join(t.TempDir(), "fake-ssh")
