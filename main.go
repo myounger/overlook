@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 
@@ -78,6 +79,14 @@ func run() error {
 	}
 	defer w.Close()
 
-	_, err = tea.NewProgram(ui.New(cfg, repo, w)).Run()
+	model := ui.New(cfg, repo, w)
+	// Live reload: watch the config file's folder, since many editors save
+	// by replacing the file. If the folder doesn't exist yet, reload is off.
+	if cw, err := watch.New([]string{filepath.Dir(*configPath)}, nil, 100*time.Millisecond); err == nil {
+		defer cw.Close()
+		model = model.WithConfigFile(*configPath, cw)
+	}
+
+	_, err = tea.NewProgram(model).Run()
 	return err
 }

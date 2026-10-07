@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"strings"
 	"time"
@@ -238,7 +239,32 @@ func decode(data []byte, cfg *Config) error {
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
 	if err := dec.Decode(cfg); err != nil && !errors.Is(err, io.EOF) {
-		return err
+		return plainYAMLError(err)
 	}
 	return nil
+}
+
+var (
+	unknownField = regexp.MustCompile(`field (\S+) not found in type \S+`)
+	cannotDecode = regexp.MustCompile(`cannot unmarshal !!\w+ ` + "`" + `([^` + "`" + `]*)` + "`" + ` into \S+`)
+)
+
+// plainYAMLError rewords the YAML library's errors for people: it drops
+// the "yaml: unmarshal errors:" lead-in and Go type names, and puts the
+// line number first, since that's what you need to find the mistake.
+//
+//	line 3: field veiw not found in type config.FilesPanel
+//	→ line 3: unknown setting "veiw"
+func plainYAMLError(err error) error {
+	var te *yaml.TypeError
+	if !errors.As(err, &te) {
+		return errors.New(strings.TrimPrefix(err.Error(), "yaml: "))
+	}
+	msgs := make([]string, len(te.Errors))
+	for i, e := range te.Errors {
+		e = unknownField.ReplaceAllString(e, `unknown setting "$1"`)
+		e = cannotDecode.ReplaceAllString(e, `"$1" is the wrong kind of value here`)
+		msgs[i] = e
+	}
+	return errors.New(strings.Join(msgs, "; "))
 }

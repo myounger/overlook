@@ -2,7 +2,9 @@
 #
 # Print this file with `overlook --default-config`, save it to
 # ~/.config/overlook/config.yml, and change what you like. Any setting you
-# leave out keeps the default shown here.
+# leave out keeps the default shown here. Overlook picks up changes as soon
+# as you save; if the file has a mistake, it says so and keeps the old
+# settings.
 
 # Colors take an ANSI color number ("0"-"255") or a hex value ("#7aa2f7").
 # ANSI numbers 0-15 follow your terminal's theme. An empty string ("") means

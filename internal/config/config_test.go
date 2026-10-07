@@ -57,3 +57,19 @@ func TestLoadRejectsBadOrder(t *testing.T) {
 		}
 	}
 }
+
+func TestErrorsArePlain(t *testing.T) {
+	tests := map[string]string{
+		"panels:\n  files:\n    veiw: flat\n": `line 3: unknown setting "veiw"`,
+		"refresh:\n  poll: soon\n":            `line 2: "soon" is the wrong kind of value here`,
+		"theme: [\n":                          "line 1: did not find expected node content",
+	}
+	for body, want := range tests {
+		path := filepath.Join(t.TempDir(), "config.yml")
+		os.WriteFile(path, []byte(body), 0o644)
+		_, err := Load(path)
+		if err == nil || err.Error() != path+": "+want {
+			t.Errorf("%q:\n got %v\nwant %s: %s", body, err, path, want)
+		}
+	}
+}

@@ -41,6 +41,11 @@ type Model struct {
 	switching string // worktree path being switched to
 	pulling   bool
 	msg       message
+	pollGen   int // bumped when the poll interval changes, retiring the old timer
+
+	configPath    string
+	configWatcher *watch.Watcher
+	configSum     [32]byte // of the config file as last read
 
 	focus     panelID
 	lastList  panelID // the list panel last focused, which stays expanded
@@ -101,11 +106,11 @@ type (
 		err   error
 	}
 	changedMsg struct{}
-	pollMsg    struct{}
+	pollMsg    struct{ gen int }
 )
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.load(), m.waitForChange(), m.poll())
+	return tea.Batch(m.load(), m.waitForChange(), m.poll(), m.waitForConfig())
 }
 
 func (m Model) load() tea.Cmd {
@@ -218,7 +223,8 @@ func (m Model) poll() tea.Cmd {
 	if m.cfg.Refresh.Poll <= 0 {
 		return nil
 	}
-	return tea.Tick(m.cfg.Refresh.Poll, func(time.Time) tea.Msg { return pollMsg{} })
+	gen := m.pollGen
+	return tea.Tick(m.cfg.Refresh.Poll, func(time.Time) tea.Msg { return pollMsg{gen} })
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -286,7 +292,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case changedMsg:
 		return m, tea.Batch(m.load(), m.waitForChange())
 	case pollMsg:
+		if msg.gen != m.pollGen {
+			return m, nil
+		}
 		return m, tea.Batch(m.load(), m.poll())
+	case configChangedMsg:
+		return m, tea.Batch(m.reloadConfig(), m.waitForConfig())
 	}
 	return m, nil
 }
