@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
-	"syscall"
 )
 
 // PullResult describes a pull that succeeded.
@@ -23,10 +22,10 @@ type PullResult struct {
 // command Overlook runs that changes the repo.
 //
 // It can't ask for anything: GIT_TERMINAL_PROMPT=0 stops git's own
-// username/password prompts, and running in a new session with no
-// controlling terminal stops ssh from asking for a passphrase on /dev/tty,
-// which would otherwise fight Overlook for the screen. Credentials from a
-// keychain or ssh-agent still work.
+// username/password prompts, and detach (see pull_unix.go and
+// pull_windows.go) cuts git and ssh off from the terminal so ssh can't ask
+// for a passphrase there, which would otherwise fight Overlook for the
+// screen. Credentials from a keychain or ssh-agent still work.
 func Pull(ctx context.Context, r Repo, upstream string) (PullResult, error) {
 	before, err := run(r.Root, "rev-parse", "HEAD")
 	if err != nil {
@@ -36,7 +35,7 @@ func Pull(ctx context.Context, r Repo, upstream string) (PullResult, error) {
 	cmd := exec.CommandContext(ctx, "git", "pull", "--ff-only", "--no-rebase")
 	cmd.Dir = r.Root
 	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_MERGE_AUTOEDIT=no")
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	detach(cmd)
 	var out bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &out
 	if err := cmd.Run(); err != nil {

@@ -1,66 +1,140 @@
 # Overlook
 
-A read-only terminal viewer for a git repo, meant to run in a panel next to Claude Code so you can watch what changes as it works.
+A read-only terminal view of a git repo, made to sit in a small panel next to [Claude Code](https://claude.com/claude-code) so you can watch what changes as it works. It follows Claude into git worktrees.
 
-Think lazygit, but with only the panels you want and no ability to change anything - with one exception, pulling the latest code.
-
-## Goals
-
-- **Read-only.** Changed files, diffs, staged vs unstaged, recent commits, current branch. No staging, committing, or discarding.
-- **One write action: pull.** Always `git pull --ff-only`, so it either fast-forwards cleanly or refuses. It never creates a merge or a conflict.
-- **Follows worktrees.** When Claude Code spins off a git worktree, Overlook notices and can switch to it, instead of staying stuck on the main folder the way lazygit does.
-- **Configurable layout.** Choose which panels show, their sizes, and keybindings from a config file.
-
-## Build and install
-
-You need Go (`brew install go`). Then, from this folder:
-
-```sh
-make build     # compiles ./overlook
-make install   # builds, then copies it to ~/.local/bin (must be on your PATH)
-make test      # go vet + unit tests
+```
+ overlook 2   claude-fix ✻ 3
+╭─ Status ──────────────────────────────────────╮
+│ overlook ⎇ claude-fix → worktree-fix ↑1       │
+╰───────────────────────────────────────────────╯
+╭─ Files · 3 ───────────────────────────────────╮
+│ ▼ internal/ui                                 │
+│      M model.go                               │
+│     ?? pull.go                                │
+│  M README.md                                  │
+╰───────────────────────────────────────────────╯
+╭─ Diff · internal/ui/model.go +12 -3 ──────────╮
+│ ── line 42 · func (m Model) Update ────────── │
+│      case tea.KeyPressMsg:                    │
+│ -        return m.handleKey(msg.String())     │
+│ +        return m.handleKey(msg)              │
+╰───────────────────────────────────────────────╯
+╭─ Branches · 4 ────────────────────────────────╮
+│ 2m * worktree-fix ⎇ claude-fix                │
+│ 1h   main ✓                                   │
+╰───────────────────────────────────────────────╯
+ enter fold/diff · ` flat · p pull · z zoom · q quit
 ```
 
-Run `overlook` inside any repo, or `overlook path/to/repo`. Press `r` to refresh and `q` to quit.
+## Why
 
-## Configuration
+[lazygit](https://github.com/jesseduffield/lazygit) is great, but as a side panel it shows more than you need, and you can't hide the panels you don't use. And when Claude Code moves into a git worktree, lazygit stays on the main folder. Overlook shows only what you choose, and goes where Claude goes.
 
-`overlook --default-config` prints every setting with comments. Save it to `~/.config/overlook/config.yml` and edit it. Settings you leave out keep their defaults, and a misspelled key is reported as an error. Changes apply as soon as you save, without restarting; if the file has a mistake, Overlook says so and keeps the old settings.
+## What it does
 
-The mouse works too: the wheel scrolls the panel under the pointer, clicking selects (click again to fold a folder or open a diff), and clicking a worktree tab switches to it. Hold Shift (Option in iTerm2) to select text. Set `layout.mouse: false` to turn it off.
+- **Files**: changed files as a foldable tree or a flat list, with lazygit-style status letters (staged green, unstaged red) and names colored by kind of change.
+- **Diff**: the selected file's or folder's changes since the last commit. Long lines wrap, and each block of changes starts with `── line 42 · func … ──` instead of git's `@@` header. Optionally piped through [delta](https://github.com/dandavison/delta).
+- **Branches**: local branches with last-commit age, ahead/behind, the worktree each is checked out in, and cleanup hints: **gone** (the remote branch was deleted, e.g. after a PR merged) and **merged**.
+- **Log** (off by default): recent commits, with `↑` on unpushed ones. Selecting one shows its diff.
+- **Worktrees**: a tab for the main folder and each worktree, with change counts. Overlook switches to a new worktree as soon as it's created, and falls back to the main folder if the one you're viewing is removed.
+- **Live**: branch switches, staging, commits, and fetches show up instantly; file edits within two seconds.
+- **Read-only**, with one exception: **pull**, which only fast-forwards (see below).
+- **Configurable**: every color, key, and panel, and the layout. Changes apply as soon as you save.
 
-## Following Claude Code into worktrees
+## Install
 
-On its own, Overlook switches to a worktree as soon as it's created. For an exact answer, let Claude Code tell it where each session is working:
+**Homebrew** (macOS and Linux):
+
+```sh
+brew install --cask myounger/tap/overlook
+```
+
+**Download**: grab the archive for your platform from the [latest release](https://github.com/myounger/overlook/releases/latest) (macOS, Linux, and Windows; Intel and ARM), unpack it, and put `overlook` somewhere on your `PATH`.
+
+**With Go** (1.27 or newer):
+
+```sh
+go install github.com/myounger/overlook@latest
+```
+
+**From source**:
+
+```sh
+git clone https://github.com/myounger/overlook && cd overlook
+make install   # builds and copies the binary to ~/.local/bin
+```
+
+Overlook needs `git` on your `PATH`.
+
+## Use
+
+Run `overlook` inside a repo, or `overlook path/to/repo`.
+
+| Key | Does |
+|---|---|
+| `tab` / `shift+tab` | move between panels |
+| `j` `k` / arrows | move; in the diff, scroll |
+| `g` / `G`, `ctrl+u` / `ctrl+d` | top / bottom, page up / down |
+| `enter` | fold a folder; on a file or commit, open its diff |
+| `esc` | back from the diff, or out of zoom |
+| `-` / `=` | fold / unfold every folder |
+| `` ` `` | Files as a tree or a flat list |
+| `z` | zoom: the focused panel fills the window |
+| `[` / `]` | previous / next worktree |
+| `p` | pull |
+| `r` | refresh now (everything refreshes on its own) |
+| `q` | quit |
+
+The mouse works too: the wheel scrolls the panel under the pointer, clicking a row selects it (click again to fold a folder or open a diff), and clicking a worktree tab switches to it. Hold Shift (Option in iTerm2) to select text, or set `layout.mouse: false` to turn the mouse off.
+
+## Following Claude Code
+
+On its own, Overlook switches to a worktree as soon as one appears. For an exact answer, let Claude Code tell it which worktree each session is working in:
 
 ```sh
 overlook hook --settings
 ```
 
-This prints a `hooks` block. Add it to `~/.claude/settings.json` (merge it into an existing `"hooks"` if you have one). After that, whenever a Claude Code session moves to a different worktree, Overlook switches to it. Worktree tabs show a ✻ where a session is working. If you switch away by hand while Claude keeps working in the same place, Overlook stays where you put it.
+This prints a `hooks` block to add to `~/.claude/settings.json`. If you already have hooks for `PostToolUse`, `SessionStart`, or `SessionEnd`, add Overlook's entries next to them rather than replacing yours. After that, whenever a session moves to a different worktree, Overlook follows, and the worktree's tab shows ✻ while a session works there. If you switch away by hand while Claude keeps working in the same place, Overlook stays where you put it.
 
-The hook only observes. It runs in the background after each tool call, never prints anything, and always succeeds, so it can't slow down or change what Claude does. It records each session's worktree in `~/.local/state/overlook/claude/` and removes the record when the session ends. Set `worktrees.followClaude: false` to stop following without removing the hook.
+The hook only observes: it runs in the background after each tool call, prints nothing, and always succeeds, so it can't slow Claude down or change what it does. It keeps one small file per session in `~/.local/state/overlook/claude/` and removes it when the session ends. Set `worktrees.followClaude: false` to stop following without removing the hook.
 
-## Planned stack
+## Pull
 
-- **Go** - builds to a single binary with no runtime to install. lazygit is also Go, so its source is a useful reference.
-- **Bubble Tea** (TUI framework), **Lip Gloss** (styling), **Bubbles** (lists, viewports).
-- **The `git` CLI** for all git data (`git status --porcelain=v2`, `git diff`, `git log`, `git worktree list --porcelain`) rather than a git library.
-- **fsnotify** to watch the repo and refresh live, debounced so a burst of edits doesn't trigger a burst of refreshes.
-- **Config** in `~/.config/overlook/config.yml`.
+`p` runs `git pull --ff-only`: your branch either fast-forwards to its upstream or nothing changes. It never merges, rebases, or leaves a conflict. It also can't stop to ask for a password, which would freeze the screen: if git needs credentials it can't get from your keychain or ssh-agent, pull fails with a message saying so. Set `pull.enabled: false` to make Overlook strictly read-only.
 
-## Worktree detection
+## Configure
 
-1. Watch `.git/worktrees/` in the main repo. Git adds a folder there for each linked worktree and removes it when the worktree goes away. On a change, run `git worktree list --porcelain` for paths and branches.
-2. Decide which worktree to show: auto-switch to a newly created one, follow whichever has the most recent file activity, and show a tab strip of all worktrees with change counts.
-3. Optional, later: a Claude Code hook that writes the session's working directory to a file Overlook watches, for an exact answer instead of a guess.
+```sh
+mkdir -p ~/.config/overlook
+overlook --default-config > ~/.config/overlook/config.yml
+```
 
-As of October 2026, none of lazygit, gitui, tig, or delta follows a worktree created outside the tool. lazygit only switches manually (Worktrees tab).
+The file lists every setting with a comment; delete what you don't change. Some highlights:
 
-## Phases
+- `panels.<name>.show` and `size`, and `layout.order`: which panels appear, how much room each gets, and their order.
+- `layout.expandFocused`: the list panel you're in gets the room, and the others shrink to a few rows.
+- `panels.diff.position`: diff on the right in wide windows, below in narrow ones, or always one or the other.
+- `panels.diff.pager`: e.g. `delta --paging=never` for syntax highlighting.
+- `worktrees.follow`: also switch to whichever worktree has files changing.
+- `theme.*`: every color, as an ANSI number (follows your terminal's theme) or `#hex`.
+- `keys.*`: every key.
 
-1. **MVP** - changed-files list, diff pane, live refresh, keyboard navigation.
-2. **Worktrees** - detection, auto-switch, tab strip.
-3. **Comfort** - syntax-highlighted diffs (or pipe through `delta`), staged/unstaged sections, commit log panel, pull.
-4. **Configurability** - panels on/off, layout, sizes, keybindings.
-5. **Distribution** - release builds, maybe a Homebrew tap.
+Overlook picks up changes as soon as you save. If the file has a mistake, it says which line and keeps the old settings.
+
+## Build
+
+```sh
+make build              # ./overlook
+make test               # go vet and the tests
+make install            # build and copy to ~/.local/bin
+make release-snapshot   # build every release platform into dist/, publishing nothing
+```
+
+Releases are made by pushing a version tag (`git tag v0.1.0 && git push origin v0.1.0`). GitHub Actions then runs [GoReleaser](https://goreleaser.com), which publishes the archives and updates the Homebrew cask.
+
+Built with [Bubble Tea](https://github.com/charmbracelet/bubbletea), [Lip Gloss](https://github.com/charmbracelet/lipgloss), and [fsnotify](https://github.com/fsnotify/fsnotify).
+
+## License
+
+[MIT](LICENSE)

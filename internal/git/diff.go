@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 )
 
@@ -80,9 +81,13 @@ func runAllowing(dir string, ok int, args ...string) (string, error) {
 }
 
 // Pipe runs a shell command (such as "delta --paging=never") with input on
-// stdin and COLUMNS set to width, and returns its output.
+// stdin and COLUMNS set to width, and returns its output. The shell is sh,
+// or cmd on Windows.
 func Pipe(command, input string, width int) (string, error) {
 	cmd := exec.Command("sh", "-c", command)
+	if runtime.GOOS == "windows" {
+		cmd = exec.Command("cmd", "/C", command)
+	}
 	cmd.Stdin = strings.NewReader(input)
 	cmd.Env = append(os.Environ(), fmt.Sprintf("COLUMNS=%d", width))
 	var stdout, stderr bytes.Buffer

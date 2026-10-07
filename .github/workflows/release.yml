@@ -1,0 +1,33 @@
+# Pushing a version tag (git tag v0.1.0 && git push origin v0.1.0) builds
+# every platform with GoReleaser, publishes a GitHub release with the
+# archives and checksums, and updates the Homebrew cask in
+# myounger/homebrew-tap. HOMEBREW_TAP_GITHUB_TOKEN is a repository secret:
+# a token allowed to push to that tap repo.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0 # GoReleaser builds the changelog from history
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - run: git config --global user.name ci && git config --global user.email ci@example.com
+      - run: go test ./...
+      - uses: goreleaser/goreleaser-action@v7
+        with:
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}

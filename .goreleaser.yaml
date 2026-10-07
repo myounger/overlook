@@ -1,0 +1,51 @@
+# Release builds. Pushing a tag like v0.1.0 runs this from
+# .github/workflows/release.yml: it builds every platform, attaches the
+# archives to a GitHub release, and updates the Homebrew cask in
+# myounger/homebrew-tap. Try it locally with `make release-snapshot`.
+version: 2
+project_name: overlook
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos: [darwin, linux, windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+
+archives:
+  - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+      - LICENSE
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^Merge pull request"
+
+homebrew_casks:
+  - name: overlook
+    repository:
+      owner: myounger
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    homepage: https://github.com/myounger/overlook
+    description: Read-only terminal view of a git repo that follows Claude Code into worktrees
+    license: MIT
+    # The binary isn't signed by Apple, and casks are downloaded with the
+    # quarantine flag set, so macOS would refuse to run it. Clear the flag.
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/overlook"]
+          end
