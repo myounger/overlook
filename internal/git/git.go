@@ -6,8 +6,10 @@ package git
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -132,7 +134,31 @@ func ReadStatus(r Repo, untracked Untracked) (Status, error) {
 	if err != nil {
 		return Status{}, err
 	}
-	return parseStatus(out), nil
+	s := parseStatus(out)
+	s.Files = slices.DeleteFunc(s.Files, func(f File) bool { return r.isOwnWorktree(f) })
+	return s, nil
+}
+
+// isOwnWorktree reports whether an untracked folder is one of this repo's
+// linked worktrees, like the ones Claude Code creates in .claude/worktrees/.
+// Those aren't new files, so they're left out. Its .git file points back
+// into this repo's shared git dir; other nested projects don't.
+func (r Repo) isOwnWorktree(f File) bool {
+	if !f.Untracked() || !strings.HasSuffix(f.Path, "/") {
+		return false
+	}
+	data, err := os.ReadFile(filepath.Join(r.Root, f.Path, ".git"))
+	if err != nil {
+		return false
+	}
+	gitdir, ok := strings.CutPrefix(strings.TrimSpace(string(data)), "gitdir: ")
+	if !ok {
+		return false
+	}
+	if !filepath.IsAbs(gitdir) {
+		gitdir = filepath.Join(r.Root, f.Path, gitdir)
+	}
+	return strings.HasPrefix(CanonicalPath(gitdir), filepath.Join(r.CommonDir, "worktrees")+string(filepath.Separator))
 }
 
 // parseStatus reads porcelain v2 output with -z. Each entry ends in NUL; a

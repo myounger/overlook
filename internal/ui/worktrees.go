@@ -18,6 +18,7 @@ type worktreeSet struct {
 	trees    []git.Worktree // usable ones (not prunable), main first
 	activity map[string]git.Activity
 	seen     map[string]bool // paths in the previous list; nil before the first one
+	claude   map[string]bool // paths where a Claude Code session is working
 }
 
 func newWorktreeSet(cfg config.Worktrees) worktreeSet {
@@ -127,6 +128,9 @@ func (s *worktreeSet) tabs(repoName, active string, width int) (tabs []tab, scro
 	activeIdx := 0
 	for i, w := range s.trees {
 		label := w.Name(repoName)
+		if s.claude[w.Path] && s.cfg.FollowClaude {
+			label += " ✻"
+		}
 		if act, ok := s.activity[w.Path]; ok && s.cfg.Counts && act.Changed > 0 {
 			label += fmt.Sprintf(" %d", act.Changed)
 		}

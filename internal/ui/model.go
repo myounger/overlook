@@ -47,6 +47,9 @@ type Model struct {
 	configWatcher *watch.Watcher
 	configSum     [32]byte // of the config file as last read
 
+	claudeWatcher *watch.Watcher
+	claudeSeen    map[string]string // session id -> worktree it was last in
+
 	focus     panelID
 	lastList  panelID // the list panel last focused, which stays expanded
 	zoomed    bool    // the focused panel fills the window
@@ -110,7 +113,7 @@ type (
 )
 
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(m.load(), m.waitForChange(), m.poll(), m.waitForConfig())
+	return tea.Batch(m.load(), m.waitForChange(), m.poll(), m.waitForConfig(), m.readClaude(), m.waitForClaude())
 }
 
 func (m Model) load() tea.Cmd {
@@ -148,7 +151,8 @@ func loadWorktrees(repo git.Repo, untracked git.Untracked, needActivity bool) wo
 			continue
 		}
 		wg.Go(func() {
-			if act, err := git.ReadActivity(w.Path, untracked); err == nil {
+			wt := git.Repo{Root: w.Path, CommonDir: repo.CommonDir}
+			if act, err := git.ReadActivity(wt, untracked); err == nil {
 				mu.Lock()
 				msg.activity[w.Path] = act
 				mu.Unlock()
@@ -298,6 +302,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(m.load(), m.poll())
 	case configChangedMsg:
 		return m, tea.Batch(m.reloadConfig(), m.waitForConfig())
+	case claudeChangedMsg:
+		return m, tea.Batch(m.readClaude(), m.waitForClaude())
+	case claudeMsg:
+		return m, m.followClaude(msg.states)
 	}
 	return m, nil
 }

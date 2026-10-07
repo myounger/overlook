@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -51,13 +52,13 @@ func TestActivityChangesWhenAModifiedFileIsEditedAgain(t *testing.T) {
 	run("commit", "-q", "-m", "init")
 
 	os.WriteFile(file, []byte("two\n"), 0o644)
-	first, err := ReadActivity(dir, UntrackedAll)
+	first, err := ReadActivity(Repo{Root: dir}, UntrackedAll)
 	if err != nil {
 		t.Fatal(err)
 	}
 	os.WriteFile(file, []byte("three\n"), 0o644)
 	os.Chtimes(file, time.Now().Add(time.Second), time.Now().Add(time.Second))
-	second, _ := ReadActivity(dir, UntrackedAll)
+	second, _ := ReadActivity(Repo{Root: dir}, UntrackedAll)
 
 	if first.Changed != 1 || second.Changed != 1 {
 		t.Errorf("changed counts %d, %d; want 1, 1", first.Changed, second.Changed)
@@ -65,12 +66,51 @@ func TestActivityChangesWhenAModifiedFileIsEditedAgain(t *testing.T) {
 	if first.Fingerprint == second.Fingerprint {
 		t.Error("fingerprint didn't change after editing an already-modified file")
 	}
-	again, _ := ReadActivity(dir, UntrackedAll)
+	again, _ := ReadActivity(Repo{Root: dir}, UntrackedAll)
 	if again != second {
 		t.Error("fingerprint changed with no edits")
 	}
 	status, _ := ReadStatus(Repo{Root: dir}, UntrackedAll)
 	if ActivityOf(dir, status.Files) != second {
 		t.Error("ActivityOf and ReadActivity disagree on the same state")
+	}
+}
+
+// Claude Code creates worktrees inside the repo (.claude/worktrees/<name>),
+// which git lists as an untracked folder in the main working tree.
+func TestStatusHidesOwnNestedWorktrees(t *testing.T) {
+	dir := t.TempDir()
+	run := func(args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		cmd.Env = append(cmd.Environ(), "GIT_AUTHOR_NAME=t", "GIT_AUTHOR_EMAIL=t@t", "GIT_COMMITTER_NAME=t", "GIT_COMMITTER_EMAIL=t@t")
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %v: %v\n%s", args, err, out)
+		}
+	}
+	run("init", "-q", "-b", "main")
+	run("commit", "-q", "--allow-empty", "-m", "init")
+	run("worktree", "add", "-q", ".claude/worktrees/probe", "-b", "worktree-probe")
+	// A separate nested repo is someone else's project and stays visible.
+	os.MkdirAll(filepath.Join(dir, "vendor", "other"), 0o755)
+	run("init", "-q", "vendor/other")
+	os.WriteFile(filepath.Join(dir, "new.txt"), []byte("x"), 0o644)
+
+	repo, _ := Locate(dir)
+	s, err := ReadStatus(repo, UntrackedAll)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var paths []string
+	for _, f := range s.Files {
+		paths = append(paths, f.Path)
+	}
+	if got := strings.Join(paths, " "); got != "new.txt vendor/other/" {
+		t.Errorf("got %q, want the new file and the nested repo, not the worktree", got)
+	}
+	// The worktree tabs' change counts go through the same filter.
+	if act, _ := ReadActivity(repo, UntrackedAll); act.Changed != 2 {
+		t.Errorf("activity counts %d changes, want 2", act.Changed)
 	}
 }

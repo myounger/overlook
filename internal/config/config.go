@@ -107,10 +107,11 @@ type DiffPanel struct {
 }
 
 type Worktrees struct {
-	Tabs       bool `yaml:"tabs"`
-	Counts     bool `yaml:"counts"`
-	AutoSwitch bool `yaml:"autoSwitch"`
-	Follow     bool `yaml:"follow"`
+	Tabs         bool `yaml:"tabs"`
+	Counts       bool `yaml:"counts"`
+	AutoSwitch   bool `yaml:"autoSwitch"`
+	Follow       bool `yaml:"follow"`
+	FollowClaude bool `yaml:"followClaude"`
 }
 
 type Pull struct {
