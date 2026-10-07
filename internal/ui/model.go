@@ -22,6 +22,7 @@ const (
 	filesID panelID = iota
 	branchesID
 	diffID
+	statusID // not focusable; has a place on screen
 )
 
 type Model struct {
@@ -42,7 +43,9 @@ type Model struct {
 	msg       message
 
 	focus     panelID
-	zoomed    bool // the focused panel fills the window
+	lastList  panelID // the list panel last focused, which stays expanded
+	zoomed    bool    // the focused panel fills the window
+	rects     map[panelID]rect
 	diffRight bool // the diff sits right of the other panels instead of below
 	width     int
 	height    int
@@ -60,7 +63,7 @@ func New(cfg config.Config, repo git.Repo, w *watch.Watcher) Model {
 		worktrees: newWorktreeSet(cfg.Worktrees),
 	}
 	if shown := m.shownPanels(); len(shown) > 0 {
-		m.focus = shown[0]
+		m.setFocus(shown[0])
 	}
 	return m
 }
@@ -295,4 +298,16 @@ func (m Model) View() tea.View {
 		v.WindowTitle += " ⎇ " + m.repo.WorktreeName()
 	}
 	return v
+}
+
+// setFocus moves focus to a panel. Focusing Files or Branches makes it the
+// expanded one; focusing the diff leaves the layout as it was.
+func (m *Model) setFocus(id panelID) {
+	m.focus = id
+	if isList(id) && id != m.lastList {
+		m.lastList = id
+		if m.cfg.Layout.ExpandFocused {
+			m.layout()
+		}
+	}
 }

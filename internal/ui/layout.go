@@ -11,22 +11,30 @@ import (
 
 const statusHeight = 3
 
-// layout sizes every panel. From the top: worktree tabs, then a column of
-// Status and the list panels, which share the height in proportion to
-// their sizes. The diff either sits right of that column or joins the
-// bottom of it. Zoomed, the focused panel gets the whole body.
+// rect is a panel's place on screen, in cells.
+type rect struct{ x, y, w, h int }
+
+func (r rect) contains(x, y int) bool {
+	return x >= r.x && x < r.x+r.w && y >= r.y && y < r.y+r.h
+}
+
+// layout sizes and places every panel. From the top: worktree tabs, then a
+// column of Status and the stacked panels, which share the height in
+// proportion to their sizes. The diff either sits right of that column or
+// joins the stack. Zoomed, the focused panel gets the whole body.
 func (m *Model) layout() {
-	body := m.height
+	top, body := 0, m.height
 	if m.worktrees.showTabs() {
-		body--
+		top, body = 1, body-1
 	}
 	if m.cfg.Layout.Footer {
 		body--
 	}
 	body = max(body, 0)
+	m.rects = map[panelID]rect{}
 
 	if m.zoomed {
-		m.sizePanel(m.focus, m.width, body)
+		m.place(m.focus, rect{0, top, m.width, body})
 		return
 	}
 
@@ -36,27 +44,78 @@ func (m *Model) layout() {
 	if m.diffRight {
 		diffW := m.width * d.RightWidth / 100
 		colW = m.width - diffW
-		m.diff.setSize(diffW, body)
+		m.place(diffID, rect{colW, top, diffW, body})
 	}
 
-	stackH := body
+	y, stackH := top, body
 	if m.cfg.Panels.Status.Show {
-		stackH = max(stackH-statusHeight, 0)
+		m.rects[statusID] = rect{0, y, colW, statusHeight}
+		y, stackH = y+statusHeight, max(stackH-statusHeight, 0)
 	}
 	stack := m.stackedPanels()
-	total := 0
+	for i, h := range m.stackHeights(stack, stackH) {
+		m.place(stack[i], rect{0, y, colW, h})
+		y += h
+	}
+}
+
+// stackHeights splits the column's height between the stacked panels by
+// their sizes. With layout.expandFocused, the list panel you're not in
+// (Files or Branches) then shrinks to layout.collapsedRows rows, and the
+// rows it gives up go to the list panel you're in, or were last in. Every
+// other panel, the diff included, keeps its height either way.
+func (m Model) stackHeights(stack []panelID, total int) []int {
+	hs := make([]int, len(stack))
+	weight := 0
 	for _, id := range stack {
-		total += m.panelSize(id)
+		weight += m.panelSize(id)
 	}
-	left := stackH
+	left := total
 	for i, id := range stack {
-		h := stackH * m.panelSize(id) / total
+		hs[i] = total * m.panelSize(id) / weight
 		if i == len(stack)-1 {
-			h = left
+			hs[i] = left
 		}
-		left -= h
-		m.sizePanel(id, colW, h)
+		left -= hs[i]
 	}
+
+	if !m.cfg.Layout.ExpandFocused {
+		return hs
+	}
+	expanded := slices.Index(stack, m.expandedList(stack))
+	if expanded < 0 {
+		return hs
+	}
+	collapsed := m.cfg.Layout.CollapsedRows + 2 // plus the border
+	for i, id := range stack {
+		if isList(id) && i != expanded && hs[i] > collapsed {
+			hs[expanded] += hs[i] - collapsed
+			hs[i] = collapsed
+		}
+	}
+	return hs
+}
+
+// expandedList is the list panel that gets the room when the other one
+// collapses: the one you're in or were last in.
+func (m Model) expandedList(stack []panelID) panelID {
+	if slices.Contains(stack, m.lastList) {
+		return m.lastList
+	}
+	for _, id := range stack {
+		if isList(id) {
+			return id
+		}
+	}
+	return m.lastList
+}
+
+func isList(id panelID) bool { return id == filesID || id == branchesID }
+
+// place records where a panel goes and sizes it to fit.
+func (m *Model) place(id panelID, r rect) {
+	m.rects[id] = r
+	m.sizePanel(id, r.w, r.h)
 }
 
 // stackedPanels are the panels in the left column under Status.
@@ -129,11 +188,7 @@ func (m Model) render() string {
 			case m.loaded:
 				body = statusLine(m.st, m.cfg.Panels.Status, m.repo, m.status, m.statusErr)
 			}
-			colW := m.width
-			if m.diffRight {
-				colW -= m.diff.width
-			}
-			col = append(col, renderPanel(m.st, "Status", body, colW, statusHeight, false))
+			col = append(col, renderPanel(m.st, "Status", body, m.rects[statusID].w, statusHeight, false))
 		}
 		for _, id := range m.stackedPanels() {
 			col = append(col, m.panelView(id))

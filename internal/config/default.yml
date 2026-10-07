@@ -102,6 +102,11 @@ layout:
   # out goes after the ones listed. When the diff sits on the right, it
   # keeps its place in the Tab order.
   order: [files, diff, branches]
+  # Files and Branches take turns: the one you're in (or were last in) gets
+  # the room, and the other shrinks to collapsedRows rows. The diff keeps
+  # its size so you can still read it while moving through Files.
+  expandFocused: true
+  collapsedRows: 3
   footer: true         # key hints along the bottom; also where messages appear
   messageTime: 4s      # how long a message like "Pulled 3 commits" stays; errors stay until a key press
 

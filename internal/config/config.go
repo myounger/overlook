@@ -118,9 +118,11 @@ type Pull struct {
 }
 
 type Layout struct {
-	Order       []string      `yaml:"order"`
-	Footer      bool          `yaml:"footer"`
-	MessageTime time.Duration `yaml:"messageTime"`
+	Order         []string      `yaml:"order"`
+	ExpandFocused bool          `yaml:"expandFocused"`
+	CollapsedRows int           `yaml:"collapsedRows"`
+	Footer        bool          `yaml:"footer"`
+	MessageTime   time.Duration `yaml:"messageTime"`
 }
 
 // PanelNames are the panels layout.order can arrange, in default order.
@@ -219,6 +221,7 @@ func (c Config) validate() error {
 		oneOf("panels.files.untracked", c.Panels.Files.Untracked, "all", "folders", "none"),
 		oneOf("panels.branches.sort", c.Panels.Branches.Sort, "recent", "name"),
 		atLeast1("panels.files.size", c.Panels.Files.Size),
+		between("layout.collapsedRows", c.Layout.CollapsedRows, 1, 50),
 		atLeast1("panels.branches.size", c.Panels.Branches.Size),
 		oneOf("panels.diff.position", c.Panels.Diff.Position, "auto", "right", "bottom"),
 		oneOf("panels.diff.hunkHeaders", c.Panels.Diff.HunkHeaders, "lines", "git"),
