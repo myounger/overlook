@@ -68,6 +68,11 @@ func (m *Model) wheel(mouse tea.Mouse) tea.Cmd {
 		m.diff.scroll(step * diffWheelRows)
 	case branchesID:
 		m.branches.move(step)
+	case logID:
+		m.log.move(step)
+		if m.diffFrom == logID {
+			return m.syncDiff(false)
+		}
 	case filesID:
 		m.files.move(step)
 		return m.syncDiff(false)
@@ -87,6 +92,19 @@ func (m *Model) click(x, y int) tea.Cmd {
 	m.setFocus(id)
 	if m.zoomed {
 		m.layout()
+	}
+	if id == logID {
+		r := m.rects[logID]
+		row := m.log.offset + y - r.y - 1
+		if y <= r.y || y >= r.y+r.h-1 || row >= m.log.count {
+			return m.syncDiff(false)
+		}
+		if wasFocused && row == m.log.cursor && m.cfg.Panels.Diff.Show {
+			m.setFocus(diffID) // a second click opens the diff
+			return nil
+		}
+		m.log.setCursor(row)
+		return m.syncDiff(false)
 	}
 
 	var list *listView

@@ -61,6 +61,7 @@ type Theme struct {
 	DiffDelete    string `yaml:"diffDelete"`
 	DiffHunk      string `yaml:"diffHunk"`
 	DiffFile      string `yaml:"diffFile"`
+	Hash          string `yaml:"hash"`
 }
 
 type Panels struct {
@@ -68,6 +69,7 @@ type Panels struct {
 	Files    FilesPanel    `yaml:"files"`
 	Branches BranchesPanel `yaml:"branches"`
 	Diff     DiffPanel     `yaml:"diff"`
+	Log      LogPanel      `yaml:"log"`
 }
 
 type StatusPanel struct {
@@ -106,6 +108,13 @@ type DiffPanel struct {
 	Pager         string `yaml:"pager"`
 }
 
+type LogPanel struct {
+	Show  bool `yaml:"show"`
+	Size  int  `yaml:"size"`
+	Count int  `yaml:"count"`
+	Age   bool `yaml:"age"`
+}
+
 type Worktrees struct {
 	Tabs         bool `yaml:"tabs"`
 	Counts       bool `yaml:"counts"`
@@ -129,7 +138,7 @@ type Layout struct {
 }
 
 // PanelNames are the panels layout.order can arrange, in default order.
-var PanelNames = []string{"files", "diff", "branches"}
+var PanelNames = []string{"files", "diff", "branches", "log"}
 
 type Refresh struct {
 	Debounce time.Duration `yaml:"debounce"`
@@ -231,6 +240,8 @@ func (c Config) validate() error {
 		between("panels.diff.rightWidth", c.Panels.Diff.RightWidth, 20, 80),
 		atLeast1("panels.diff.size", c.Panels.Diff.Size),
 		atLeast1("panels.diff.maxLines", c.Panels.Diff.MaxLines),
+		atLeast1("panels.log.size", c.Panels.Log.Size),
+		between("panels.log.count", c.Panels.Log.Count, 1, 1000),
 	)
 }
 

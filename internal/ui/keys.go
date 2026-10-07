@@ -26,10 +26,10 @@ func (m Model) handleKey(key string) (tea.Model, tea.Cmd) {
 		return m, m.startPull()
 	case is(k.NextPanel):
 		m.cycleFocus(1)
-		return m, nil
+		return m, m.syncDiff(false)
 	case is(k.PrevPanel):
 		m.cycleFocus(-1)
-		return m, nil
+		return m, m.syncDiff(false)
 	case is(k.NextWorktree):
 		return m, m.switchTo(m.worktrees.neighbor(m.repo.Root, 1))
 	case is(k.PrevWorktree):
@@ -43,10 +43,12 @@ func (m Model) handleKey(key string) (tea.Model, tea.Cmd) {
 		case m.zoomed:
 			m.zoomed = false
 			m.layout()
+		case m.focus == diffID && m.diffFrom == logID && m.cfg.Panels.Log.Show:
+			m.setFocus(logID)
 		case m.focus == diffID && m.cfg.Panels.Files.Show:
 			m.setFocus(filesID)
 		}
-		return m, nil
+		return m, m.syncDiff(false)
 	}
 
 	switch m.focus {
@@ -56,6 +58,12 @@ func (m Model) handleKey(key string) (tea.Model, tea.Cmd) {
 	case branchesID:
 		listKey(&m.branches.listView, is, k)
 		return m, nil
+	case logID:
+		listKey(&m.log.listView, is, k)
+		if is(k.ToggleFolder) && m.cfg.Panels.Diff.Show {
+			m.setFocus(diffID)
+		}
+		return m, m.syncDiff(false)
 	case filesID:
 		listKey(&m.files.listView, is, k)
 		switch {
@@ -131,6 +139,7 @@ func (m Model) shownPanels() []panelID {
 		"files":    {filesID, m.cfg.Panels.Files.Show},
 		"diff":     {diffID, m.cfg.Panels.Diff.Show},
 		"branches": {branchesID, m.cfg.Panels.Branches.Show},
+		"log":      {logID, m.cfg.Panels.Log.Show},
 	}
 	var ids []panelID
 	for _, name := range append(slices.Clip(m.cfg.Layout.Order), config.PanelNames...) {

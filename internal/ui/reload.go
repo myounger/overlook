@@ -67,6 +67,10 @@ func (m *Model) applyConfig(cfg config.Config) tea.Cmd {
 	m.branches.cfg = cfg.Panels.Branches
 	m.branches.setBranches(m.branches.branches, m.branches.err)
 	m.diff.cfg = cfg.Panels.Diff
+	m.log.cfg = cfg.Panels.Log
+	if !cfg.Panels.Log.Show && m.diffFrom == logID {
+		m.diffFrom = filesID
+	}
 	m.diff.setLines(m.diff.lines) // drop the old colors and wrapping; syncDiff below re-renders
 	m.worktrees.cfg = cfg.Worktrees
 	if m.watcher != nil {
