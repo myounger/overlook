@@ -231,6 +231,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case tea.KeyPressMsg:
 		return m.handleKey(msg.String())
+	case tea.MouseMsg:
+		return m.handleMouse(msg)
 	case tea.FocusMsg:
 		return m, m.load()
 	case statusMsg:
@@ -293,6 +295,9 @@ func (m Model) View() tea.View {
 	v := tea.NewView(m.render())
 	v.AltScreen = true
 	v.ReportFocus = true
+	if m.cfg.Layout.Mouse {
+		v.MouseMode = tea.MouseModeCellMotion
+	}
 	v.WindowTitle = "overlook · " + m.repo.Name()
 	if m.repo.IsWorktree() {
 		v.WindowTitle += " ⎇ " + m.repo.WorktreeName()

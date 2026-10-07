@@ -108,6 +108,10 @@ layout:
   expandFocused: true
   collapsedRows: 3
   footer: true         # key hints along the bottom; also where messages appear
+  # Scroll the panel under the pointer, click a row to select it (click it
+  # again to fold a folder or open a file's diff), click a worktree tab to
+  # switch. While it's on, hold Shift (Option in iTerm2) to select text.
+  mouse: true
   messageTime: 4s      # how long a message like "Pulled 3 commits" stays; errors stay until a key press
 
 refresh:

@@ -122,6 +122,7 @@ type Layout struct {
 	ExpandFocused bool          `yaml:"expandFocused"`
 	CollapsedRows int           `yaml:"collapsedRows"`
 	Footer        bool          `yaml:"footer"`
+	Mouse         bool          `yaml:"mouse"`
 	MessageTime   time.Duration `yaml:"messageTime"`
 }
 
