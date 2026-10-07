@@ -47,3 +47,13 @@ func TestLoadRejectsBadChoices(t *testing.T) {
 		t.Error("expected an error for view: list")
 	}
 }
+
+func TestLoadRejectsBadOrder(t *testing.T) {
+	for _, order := range []string{"[files, diff, files]", "[files, log]"} {
+		path := filepath.Join(t.TempDir(), "config.yml")
+		os.WriteFile(path, []byte("layout:\n  order: "+order+"\n"), 0o644)
+		if _, err := Load(path); err == nil {
+			t.Errorf("order %s: expected an error", order)
+		}
+	}
+}

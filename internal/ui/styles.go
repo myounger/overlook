@@ -34,6 +34,10 @@ type styles struct {
 	merged        lipgloss.Style
 	tab           lipgloss.Style
 	activeTab     lipgloss.Style
+	diffAdd       lipgloss.Style
+	diffDelete    lipgloss.Style
+	diffHunk      lipgloss.Style
+	diffFile      lipgloss.Style
 }
 
 func newStyles(t config.Theme) styles {
@@ -63,6 +67,10 @@ func newStyles(t config.Theme) styles {
 		merged:        fg(t.Merged),
 		tab:           fg(t.Tab),
 		activeTab:     fg(t.ActiveTab).Bold(true).Background(colorOf(t.SelectedBg)),
+		diffAdd:       fg(t.DiffAdd),
+		diffDelete:    fg(t.DiffDelete),
+		diffHunk:      fg(t.DiffHunk),
+		diffFile:      fg(t.DiffFile).Bold(true),
 	}
 }
 

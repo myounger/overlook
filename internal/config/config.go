@@ -53,12 +53,17 @@ type Theme struct {
 	Merged        string `yaml:"merged"`
 	ActiveTab     string `yaml:"activeTab"`
 	Tab           string `yaml:"tab"`
+	DiffAdd       string `yaml:"diffAdd"`
+	DiffDelete    string `yaml:"diffDelete"`
+	DiffHunk      string `yaml:"diffHunk"`
+	DiffFile      string `yaml:"diffFile"`
 }
 
 type Panels struct {
 	Status   StatusPanel   `yaml:"status"`
 	Files    FilesPanel    `yaml:"files"`
 	Branches BranchesPanel `yaml:"branches"`
+	Diff     DiffPanel     `yaml:"diff"`
 }
 
 type StatusPanel struct {
@@ -85,6 +90,18 @@ type BranchesPanel struct {
 	MergedInto string `yaml:"mergedInto"`
 }
 
+type DiffPanel struct {
+	Show          bool   `yaml:"show"`
+	Position      string `yaml:"position"`
+	RightMinWidth int    `yaml:"rightMinWidth"`
+	RightWidth    int    `yaml:"rightWidth"`
+	Size          int    `yaml:"size"`
+	Wrap          bool   `yaml:"wrap"`
+	HunkHeaders   string `yaml:"hunkHeaders"`
+	MaxLines      int    `yaml:"maxLines"`
+	Pager         string `yaml:"pager"`
+}
+
 type Worktrees struct {
 	Tabs       bool `yaml:"tabs"`
 	Counts     bool `yaml:"counts"`
@@ -93,8 +110,12 @@ type Worktrees struct {
 }
 
 type Layout struct {
-	Footer bool `yaml:"footer"`
+	Order  []string `yaml:"order"`
+	Footer bool     `yaml:"footer"`
 }
+
+// PanelNames are the panels layout.order can arrange, in default order.
+var PanelNames = []string{"files", "diff", "branches"}
 
 type Refresh struct {
 	Debounce time.Duration `yaml:"debounce"`
@@ -118,6 +139,10 @@ type Keys struct {
 	PrevPanel    []string `yaml:"prevPanel"`
 	NextWorktree []string `yaml:"nextWorktree"`
 	PrevWorktree []string `yaml:"prevWorktree"`
+	ScrollLeft   []string `yaml:"scrollLeft"`
+	ScrollRight  []string `yaml:"scrollRight"`
+	Zoom         []string `yaml:"zoom"`
+	Back         []string `yaml:"back"`
 }
 
 // Path returns the config file location: $XDG_CONFIG_HOME/overlook/config.yml,
@@ -163,18 +188,33 @@ func (c Config) validate() error {
 		}
 		return fmt.Errorf("%s is %q; use one of: %s", field, value, strings.Join(allowed, ", "))
 	}
-	atLeast1 := func(field string, n int) error {
-		if n >= 1 {
+	between := func(field string, n, lo, hi int) error {
+		if n >= lo && n <= hi {
 			return nil
 		}
-		return fmt.Errorf("%s is %d; use 1 or more", field, n)
+		return fmt.Errorf("%s is %d; use %d to %d", field, n, lo, hi)
+	}
+	atLeast1 := func(field string, n int) error { return between(field, n, 1, 1<<30) }
+	var orderErrs []error
+	for i, name := range c.Layout.Order {
+		if err := oneOf("layout.order", name, PanelNames...); err != nil {
+			orderErrs = append(orderErrs, err)
+		} else if slices.Contains(c.Layout.Order[:i], name) {
+			orderErrs = append(orderErrs, fmt.Errorf("layout.order lists %q twice", name))
+		}
 	}
 	return errors.Join(
+		errors.Join(orderErrs...),
 		oneOf("panels.files.view", c.Panels.Files.View, "tree", "flat"),
 		oneOf("panels.files.untracked", c.Panels.Files.Untracked, "all", "folders", "none"),
 		oneOf("panels.branches.sort", c.Panels.Branches.Sort, "recent", "name"),
 		atLeast1("panels.files.size", c.Panels.Files.Size),
 		atLeast1("panels.branches.size", c.Panels.Branches.Size),
+		oneOf("panels.diff.position", c.Panels.Diff.Position, "auto", "right", "bottom"),
+		oneOf("panels.diff.hunkHeaders", c.Panels.Diff.HunkHeaders, "lines", "git"),
+		between("panels.diff.rightWidth", c.Panels.Diff.RightWidth, 20, 80),
+		atLeast1("panels.diff.size", c.Panels.Diff.Size),
+		atLeast1("panels.diff.maxLines", c.Panels.Diff.MaxLines),
 	)
 }
 

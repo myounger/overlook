@@ -174,3 +174,36 @@ func statusChar(c byte) string {
 	}
 	return string(c)
 }
+
+// maxFolderNewFiles caps how many untracked files a folder's diff includes,
+// since each one is a separate git call.
+const maxFolderNewFiles = 50
+
+// selection returns the row under the cursor as a diff target, with a key
+// that stays the same while the same file or folder is selected.
+func (p *filesPanel) selection() (key string, t git.DiffTarget, ok bool) {
+	if p.cursor >= len(p.rows) {
+		return "", git.DiffTarget{}, false
+	}
+	n := p.rows[p.cursor].node
+	if !n.isDir() {
+		f := n.file
+		return n.key(), git.DiffTarget{Path: f.Path, OrigPath: f.OrigPath, Untracked: f.Untracked()}, true
+	}
+	t = git.DiffTarget{Path: n.path, Dir: true}
+	var walk func(*treeNode)
+	walk = func(d *treeNode) {
+		for _, c := range d.children {
+			switch {
+			case len(t.NewFiles) >= maxFolderNewFiles:
+				return
+			case c.isDir():
+				walk(c)
+			case c.file.Untracked() && !strings.HasSuffix(c.file.Path, "/"):
+				t.NewFiles = append(t.NewFiles, c.file.Path)
+			}
+		}
+	}
+	walk(n)
+	return n.key(), t, true
+}
