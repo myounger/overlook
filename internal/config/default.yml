@@ -1,0 +1,137 @@
+# Overlook configuration.
+#
+# Print this file with `overlook --default-config`, save it to
+# ~/.config/overlook/config.yml, and change what you like. Any setting you
+# leave out keeps the default shown here.
+
+# Colors take an ANSI color number ("0"-"255") or a hex value ("#7aa2f7").
+# ANSI numbers 0-15 follow your terminal's theme. An empty string ("") means
+# your terminal's default text color.
+theme:
+  border: "8"          # panel borders
+  activeBorder: "2"    # border of the focused panel
+  title: "2"           # panel titles
+  repo: ""             # repository name (always bold)
+  branch: "2"          # branch name
+  worktree: "5"        # worktree marker
+  upstream: "3"        # ahead/behind counts when out of sync
+  inSync: "2"          # check mark when in sync with the remote branch
+  muted: "8"           # secondary text, such as "no upstream"
+  success: "2"         # messages like "Pulled 3 commits"
+  error: "1"           # error messages
+  selectedBg: "8"      # background of the selected row
+  folder: "4"          # folder names in the Files tree
+  staged: "2"          # first status letter: change is staged
+  unstaged: "1"        # second status letter: change is not staged yet
+  added: "2"           # names of new and untracked files
+  modified: ""         # names of modified files
+  deleted: "1"         # names of deleted files
+  renamed: "6"         # names of renamed or copied files
+  conflicted: "5"      # names of files with merge conflicts
+  currentBranch: "2"   # the branch you're on, in the Branches panel
+  gone: "1"            # "gone": the branch's remote branch was deleted
+  merged: "6"          # "merged": everything on the branch is in the base branch
+  activeTab: "2"       # the worktree tab you're viewing
+  diffAdd: "2"         # added lines
+  diffDelete: "1"      # removed lines
+  diffHunk: "6"        # the line introducing each block of changes
+  diffFile: "4"        # file names between files in a folder's diff (always bold)
+  tab: "8"             # the other worktree tabs
+
+panels:
+  status:
+    show: true
+    upstream: true     # ahead/behind compared to the remote branch
+    worktree: true     # mark when you're inside a linked worktree
+  files:
+    show: true
+    view: tree         # tree or flat (full paths)
+    compactFolders: true  # show a folder chain with one child as "internal/ui"
+    untracked: all     # all (every new file), folders (a new folder is one entry), or none
+    size: 2            # share of the height, compared to the other list panels
+  branches:
+    show: true
+    size: 1
+    sort: recent       # recent (newest commit first) or name; the current branch is always on top
+    age: true          # how long ago each branch's last commit was
+    upstream: true     # ahead/behind, or "gone" when the remote branch was deleted
+    worktree: true     # which worktree a branch is checked out in
+    # Branches fully contained in this one are marked "merged", a hint that
+    # they can be deleted. Empty means origin's default branch (origin/HEAD),
+    # else main or master. Squash-merged PRs don't count as merged; they show
+    # as "gone" once you fetch with --prune and the remote branch is deleted.
+    mergedInto: ""
+  # The changes to the file or folder selected in Files since the last
+  # commit, staged and unstaged together.
+  diff:
+    show: true
+    position: auto     # right, bottom, or auto: right when the window is at least rightMinWidth wide
+    rightMinWidth: 100
+    rightWidth: 55     # percent of the window's width when on the right
+    size: 3            # share of the height when at the bottom
+    wrap: true         # wrap long lines at spaces; when false, scroll sideways with h and l
+    # How each block of changes is introduced: lines ("── line 30 · theme: ──",
+    # where it starts in the file and the section it's in) or git
+    # ("@@ -30,6 +30,10 @@ theme:", git's own header).
+    hunkHeaders: lines
+    maxLines: 5000     # longer diffs are cut off
+    # A command to color the diff instead of Overlook's own colors, such
+    # as "delta --paging=never". It reads the diff on stdin, gets the
+    # panel's width in $COLUMNS, and shouldn't page.
+    pager: ""
+
+# Overlook shows one working tree at a time: the main folder or one of its
+# linked worktrees (like the ones Claude Code creates).
+worktrees:
+  tabs: true           # a tab for each one along the top, once there's more than one
+  counts: true         # number of changed files on each tab
+  autoSwitch: true     # switch to a new worktree as soon as it's created
+  # Switch to whichever worktree has files changing. Off by default so
+  # Overlook doesn't jump away from what you're looking at.
+  follow: false
+
+# Pull is Overlook's only write action. It always runs git pull --ff-only,
+# which either fast-forwards your branch to its upstream or refuses and
+# changes nothing; it never merges or creates a conflict.
+pull:
+  enabled: true        # false makes Overlook strictly read-only
+  timeout: 2m
+
+layout:
+  # Top to bottom under Status, which is also the Tab order. Any panel left
+  # out goes after the ones listed. When the diff sits on the right, it
+  # keeps its place in the Tab order.
+  order: [files, diff, branches]
+  footer: true         # key hints along the bottom; also where messages appear
+  messageTime: 4s      # how long a message like "Pulled 3 commits" stays; errors stay until a key press
+
+refresh:
+  # Changes inside .git (switching branches, staging, committing, fetching)
+  # show up right away. Edits to your project's files are picked up by
+  # running `git status` on this interval; 0s turns it off.
+  poll: 2s
+  debounce: 150ms      # wait for a burst of .git changes to settle first
+
+# Each action takes a list of keys, such as "q", "ctrl+c", "enter", "tab".
+keys:
+  quit: [q, ctrl+c]
+  pull: [p]
+  refresh: [r]
+  up: [k, up]
+  down: [j, down]
+  pageUp: [pgup, ctrl+u]
+  pageDown: [pgdown, ctrl+d]
+  top: [g, home]
+  bottom: [G, end]
+  toggleFolder: [enter, space]  # on a file, this jumps to its diff
+  foldAll: ["-"]
+  unfoldAll: ["="]
+  toggleView: ["`"]    # switch the Files panel between tree and flat
+  nextPanel: [tab]
+  prevPanel: [shift+tab]
+  nextWorktree: ["]"]
+  prevWorktree: ["["]
+  scrollLeft: [h, left]    # scroll the diff sideways (when diff.wrap is false)
+  scrollRight: [l, right]
+  zoom: [z]            # fill the window with the focused panel, or go back
+  back: [esc]          # leave zoom, or go from the diff back to Files

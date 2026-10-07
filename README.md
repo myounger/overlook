@@ -11,6 +11,22 @@ Think lazygit, but with only the panels you want and no ability to change anythi
 - **Follows worktrees.** When Claude Code spins off a git worktree, Overlook notices and can switch to it, instead of staying stuck on the main folder the way lazygit does.
 - **Configurable layout.** Choose which panels show, their sizes, and keybindings from a config file.
 
+## Build and install
+
+You need Go (`brew install go`). Then, from this folder:
+
+```sh
+make build     # compiles ./overlook
+make install   # builds, then copies it to ~/.local/bin (must be on your PATH)
+make test      # go vet + unit tests
+```
+
+Run `overlook` inside any repo, or `overlook path/to/repo`. Press `r` to refresh and `q` to quit.
+
+## Configuration
+
+`overlook --default-config` prints every setting with comments. Save it to `~/.config/overlook/config.yml` and edit it. Settings you leave out keep their defaults, and a misspelled key is reported as an error.
+
 ## Planned stack
 
 - **Go** - builds to a single binary with no runtime to install. lazygit is also Go, so its source is a useful reference.
