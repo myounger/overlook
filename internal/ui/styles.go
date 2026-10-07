@@ -6,6 +6,7 @@ import (
 	"charm.land/lipgloss/v2"
 
 	"github.com/myounger/overlook/internal/config"
+	"github.com/myounger/overlook/internal/git"
 )
 
 type styles struct {
@@ -19,6 +20,15 @@ type styles struct {
 	inSync       lipgloss.Style
 	muted        lipgloss.Style
 	errText      lipgloss.Style
+	selectedBg   color.Color
+	folder       lipgloss.Style
+	staged       lipgloss.Style
+	unstaged     lipgloss.Style
+	added        lipgloss.Style
+	modified     lipgloss.Style
+	deleted      lipgloss.Style
+	renamed      lipgloss.Style
+	conflicted   lipgloss.Style
 }
 
 func newStyles(t config.Theme) styles {
@@ -34,6 +44,30 @@ func newStyles(t config.Theme) styles {
 		inSync:       fg(t.InSync),
 		muted:        fg(t.Muted),
 		errText:      lipgloss.NewStyle().Foreground(lipgloss.Red),
+		selectedBg:   colorOf(t.SelectedBg),
+		folder:       fg(t.Folder),
+		staged:       fg(t.Staged),
+		unstaged:     fg(t.Unstaged),
+		added:        fg(t.Added),
+		modified:     fg(t.Modified),
+		deleted:      fg(t.Deleted),
+		renamed:      fg(t.Renamed),
+		conflicted:   fg(t.Conflicted),
+	}
+}
+
+func (st styles) kindStyle(k git.Kind) lipgloss.Style {
+	switch k {
+	case git.Added:
+		return st.added
+	case git.Deleted:
+		return st.deleted
+	case git.Renamed:
+		return st.renamed
+	case git.Conflicted:
+		return st.conflicted
+	default:
+		return st.modified
 	}
 }
 

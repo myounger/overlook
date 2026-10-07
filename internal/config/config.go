@@ -10,6 +10,8 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
+	"strings"
 	"time"
 
 	"go.yaml.in/yaml/v3"
@@ -36,16 +38,33 @@ type Theme struct {
 	Upstream     string `yaml:"upstream"`
 	InSync       string `yaml:"inSync"`
 	Muted        string `yaml:"muted"`
+	SelectedBg   string `yaml:"selectedBg"`
+	Folder       string `yaml:"folder"`
+	Staged       string `yaml:"staged"`
+	Unstaged     string `yaml:"unstaged"`
+	Added        string `yaml:"added"`
+	Modified     string `yaml:"modified"`
+	Deleted      string `yaml:"deleted"`
+	Renamed      string `yaml:"renamed"`
+	Conflicted   string `yaml:"conflicted"`
 }
 
 type Panels struct {
 	Status StatusPanel `yaml:"status"`
+	Files  FilesPanel  `yaml:"files"`
 }
 
 type StatusPanel struct {
 	Show     bool `yaml:"show"`
 	Upstream bool `yaml:"upstream"`
 	Worktree bool `yaml:"worktree"`
+}
+
+type FilesPanel struct {
+	Show           bool   `yaml:"show"`
+	View           string `yaml:"view"`
+	CompactFolders bool   `yaml:"compactFolders"`
+	Untracked      string `yaml:"untracked"`
 }
 
 type Layout struct {
@@ -58,8 +77,18 @@ type Refresh struct {
 }
 
 type Keys struct {
-	Quit    []string `yaml:"quit"`
-	Refresh []string `yaml:"refresh"`
+	Quit         []string `yaml:"quit"`
+	Refresh      []string `yaml:"refresh"`
+	Up           []string `yaml:"up"`
+	Down         []string `yaml:"down"`
+	PageUp       []string `yaml:"pageUp"`
+	PageDown     []string `yaml:"pageDown"`
+	Top          []string `yaml:"top"`
+	Bottom       []string `yaml:"bottom"`
+	ToggleFolder []string `yaml:"toggleFolder"`
+	FoldAll      []string `yaml:"foldAll"`
+	UnfoldAll    []string `yaml:"unfoldAll"`
+	ToggleView   []string `yaml:"toggleView"`
 }
 
 // Path returns the config file location: $XDG_CONFIG_HOME/overlook/config.yml,
@@ -92,7 +121,23 @@ func Load(path string) (Config, error) {
 	if err := decode(data, &cfg); err != nil {
 		return cfg, fmt.Errorf("%s: %w", path, err)
 	}
+	if err := cfg.validate(); err != nil {
+		return cfg, fmt.Errorf("%s: %w", path, err)
+	}
 	return cfg, nil
+}
+
+func (c Config) validate() error {
+	oneOf := func(field, value string, allowed ...string) error {
+		if slices.Contains(allowed, value) {
+			return nil
+		}
+		return fmt.Errorf("%s is %q; use one of: %s", field, value, strings.Join(allowed, ", "))
+	}
+	return errors.Join(
+		oneOf("panels.files.view", c.Panels.Files.View, "tree", "flat"),
+		oneOf("panels.files.untracked", c.Panels.Files.Untracked, "all", "folders", "none"),
+	)
 }
 
 // decode rejects unknown keys so a typo in the config file is reported

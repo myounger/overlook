@@ -39,3 +39,11 @@ func TestLoadRejectsUnknownKeys(t *testing.T) {
 		t.Error("expected an error for a misspelled key")
 	}
 }
+
+func TestLoadRejectsBadChoices(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.yml")
+	os.WriteFile(path, []byte("panels:\n  files:\n    view: list\n"), 0o644)
+	if _, err := Load(path); err == nil {
+		t.Error("expected an error for view: list")
+	}
+}

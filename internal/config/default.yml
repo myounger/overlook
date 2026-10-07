@@ -17,21 +17,48 @@ theme:
   upstream: "3"        # ahead/behind counts when out of sync
   inSync: "2"          # check mark when in sync with the remote branch
   muted: "8"           # secondary text, such as "no upstream"
+  selectedBg: "8"      # background of the selected row
+  folder: "4"          # folder names in the Files tree
+  staged: "2"          # first status letter: change is staged
+  unstaged: "1"        # second status letter: change is not staged yet
+  added: "2"           # names of new and untracked files
+  modified: ""         # names of modified files
+  deleted: "1"         # names of deleted files
+  renamed: "6"         # names of renamed or copied files
+  conflicted: "5"      # names of files with merge conflicts
 
 panels:
   status:
     show: true
     upstream: true     # ahead/behind compared to the remote branch
     worktree: true     # mark when you're inside a linked worktree
+  files:
+    show: true
+    view: tree         # tree or flat (full paths)
+    compactFolders: true  # show a folder chain with one child as "internal/ui"
+    untracked: all     # all (every new file), folders (a new folder is one entry), or none
 
 layout:
   footer: true         # key hints along the bottom
 
 refresh:
-  debounce: 150ms      # wait for a burst of file changes to settle first
-  poll: 10s            # also refresh on this interval as a safety net; 0s turns it off
+  # Changes inside .git (switching branches, staging, committing, fetching)
+  # show up right away. Edits to your project's files are picked up by
+  # running `git status` on this interval; 0s turns it off.
+  poll: 2s
+  debounce: 150ms      # wait for a burst of .git changes to settle first
 
 # Each action takes a list of keys, such as "q", "ctrl+c", "enter", "tab".
 keys:
   quit: [q, ctrl+c]
   refresh: [r]
+  up: [k, up]
+  down: [j, down]
+  pageUp: [pgup, ctrl+u]
+  pageDown: [pgdown, ctrl+d]
+  top: [g, home]
+  bottom: [G, end]
+  toggleFolder: [enter, space]
+  foldAll: ["-"]
+  unfoldAll: ["="]
+  toggleView: ["`"]    # switch the Files panel between tree and flat
