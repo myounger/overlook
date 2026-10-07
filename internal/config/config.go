@@ -24,6 +24,7 @@ type Config struct {
 	Theme     Theme     `yaml:"theme"`
 	Panels    Panels    `yaml:"panels"`
 	Worktrees Worktrees `yaml:"worktrees"`
+	Pull      Pull      `yaml:"pull"`
 	Layout    Layout    `yaml:"layout"`
 	Refresh   Refresh   `yaml:"refresh"`
 	Keys      Keys      `yaml:"keys"`
@@ -39,6 +40,8 @@ type Theme struct {
 	Upstream      string `yaml:"upstream"`
 	InSync        string `yaml:"inSync"`
 	Muted         string `yaml:"muted"`
+	Success       string `yaml:"success"`
+	Error         string `yaml:"error"`
 	SelectedBg    string `yaml:"selectedBg"`
 	Folder        string `yaml:"folder"`
 	Staged        string `yaml:"staged"`
@@ -109,9 +112,15 @@ type Worktrees struct {
 	Follow     bool `yaml:"follow"`
 }
 
+type Pull struct {
+	Enabled bool          `yaml:"enabled"`
+	Timeout time.Duration `yaml:"timeout"`
+}
+
 type Layout struct {
-	Order  []string `yaml:"order"`
-	Footer bool     `yaml:"footer"`
+	Order       []string      `yaml:"order"`
+	Footer      bool          `yaml:"footer"`
+	MessageTime time.Duration `yaml:"messageTime"`
 }
 
 // PanelNames are the panels layout.order can arrange, in default order.
@@ -124,6 +133,7 @@ type Refresh struct {
 
 type Keys struct {
 	Quit         []string `yaml:"quit"`
+	Pull         []string `yaml:"pull"`
 	Refresh      []string `yaml:"refresh"`
 	Up           []string `yaml:"up"`
 	Down         []string `yaml:"down"`

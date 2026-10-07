@@ -38,6 +38,8 @@ type Model struct {
 	diff      diffPanel
 	worktrees worktreeSet
 	switching string // worktree path being switched to
+	pulling   bool
+	msg       message
 
 	focus     panelID
 	zoomed    bool // the focused panel fills the window
@@ -270,6 +272,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, m.load()
 	case diffMsg:
 		m.diff.setDiff(m.st, msg.key, msg.raw, msg.paged, msg.note, msg.err, msg.multi)
+	case pullDoneMsg:
+		return m, m.finishPull(msg)
+	case clearMessageMsg:
+		if msg.id == m.msg.id {
+			m.msg = message{}
+		}
 	case changedMsg:
 		return m, tea.Batch(m.load(), m.waitForChange())
 	case pollMsg:

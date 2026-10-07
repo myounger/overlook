@@ -123,7 +123,10 @@ func (m Model) render() string {
 		var col []string
 		if m.cfg.Panels.Status.Show {
 			body := "loading…"
-			if m.loaded {
+			switch {
+			case m.msg.text != "" && !m.cfg.Layout.Footer:
+				body = m.messageLine() // no footer to show it in
+			case m.loaded:
 				body = statusLine(m.st, m.cfg.Panels.Status, m.repo, m.status, m.statusErr)
 			}
 			colW := m.width
@@ -171,6 +174,9 @@ func blank(w, h int) string {
 // quit always stays. Moving up and down, and refresh (everything refreshes
 // on its own), are left out to save room.
 func (m Model) footer() string {
+	if m.msg.text != "" {
+		return ansi.Truncate(" "+m.messageLine(), m.width, "…")
+	}
 	k := m.cfg.Keys
 	first := func(keys []string) string {
 		if len(keys) == 0 {
@@ -205,6 +211,9 @@ func (m Model) footer() string {
 			hints = append(hints, hint{first(k.Back), "back"})
 		}
 	}
+	if m.cfg.Pull.Enabled && m.status.Upstream != "" {
+		hints = append(hints, hint{first(k.Pull), "pull"})
+	}
 	zoom := "zoom"
 	if m.zoomed {
 		zoom = "unzoom"
@@ -238,4 +247,15 @@ func (m Model) footer() string {
 		parts = parts[:len(parts)-1]
 	}
 	return m.st.muted.Render(ansi.Truncate(line(), m.width, "…"))
+}
+
+func (m Model) messageLine() string {
+	switch m.msg.kind {
+	case successMessage:
+		return m.st.success.Render(m.msg.text)
+	case errorMessage:
+		return m.st.errText.Render(m.msg.text)
+	default:
+		return m.st.muted.Render(m.msg.text)
+	}
 }

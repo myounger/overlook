@@ -218,11 +218,11 @@ func TestPanelOrder(t *testing.T) {
 
 func TestHunkLabel(t *testing.T) {
 	tests := map[string]string{
-		"@@ -30,6 +30,10 @@ theme:":     "line 30 · theme:",
-		"@@ -55,6 +59,20 @@ panels:":    "line 59 · panels:",
-		"@@ -1 +1 @@":                   "line 1",
-		"@@ -0,0 +1,3 @@":               "line 1",
-		"@@ -12,4 +0,0 @@":              "line 12", // the whole block was removed
+		"@@ -30,6 +30,10 @@ theme:":      "line 30 · theme:",
+		"@@ -55,6 +59,20 @@ panels:":     "line 59 · panels:",
+		"@@ -1 +1 @@":                    "line 1",
+		"@@ -0,0 +1,3 @@":                "line 1",
+		"@@ -12,4 +0,0 @@":               "line 12", // the whole block was removed
 		"@@ -3,2 +3,2 @@ func  main() {": "line 3 · func  main() {",
 	}
 	for in, want := range tests {

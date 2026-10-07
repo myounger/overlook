@@ -14,11 +14,16 @@ const diffScrollX = 8
 func (m Model) handleKey(key string) (tea.Model, tea.Cmd) {
 	k := m.cfg.Keys
 	is := func(keys []string) bool { return slices.Contains(keys, key) }
+	if m.msg.kind == errorMessage {
+		m.msg = message{} // an error stays until you press something
+	}
 	switch {
 	case is(k.Quit):
 		return m, tea.Quit
 	case is(k.Refresh):
 		return m, m.load()
+	case is(k.Pull):
+		return m, m.startPull()
 	case is(k.NextPanel):
 		m.cycleFocus(1)
 		return m, nil

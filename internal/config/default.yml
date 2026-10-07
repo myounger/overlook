@@ -17,6 +17,8 @@ theme:
   upstream: "3"        # ahead/behind counts when out of sync
   inSync: "2"          # check mark when in sync with the remote branch
   muted: "8"           # secondary text, such as "no upstream"
+  success: "2"         # messages like "Pulled 3 commits"
+  error: "1"           # error messages
   selectedBg: "8"      # background of the selected row
   folder: "4"          # folder names in the Files tree
   staged: "2"          # first status letter: change is staged
@@ -88,12 +90,20 @@ worktrees:
   # Overlook doesn't jump away from what you're looking at.
   follow: false
 
+# Pull is Overlook's only write action. It always runs git pull --ff-only,
+# which either fast-forwards your branch to its upstream or refuses and
+# changes nothing; it never merges or creates a conflict.
+pull:
+  enabled: true        # false makes Overlook strictly read-only
+  timeout: 2m
+
 layout:
   # Top to bottom under Status, which is also the Tab order. Any panel left
   # out goes after the ones listed. When the diff sits on the right, it
   # keeps its place in the Tab order.
   order: [files, diff, branches]
-  footer: true         # key hints along the bottom
+  footer: true         # key hints along the bottom; also where messages appear
+  messageTime: 4s      # how long a message like "Pulled 3 commits" stays; errors stay until a key press
 
 refresh:
   # Changes inside .git (switching branches, staging, committing, fetching)
@@ -105,6 +115,7 @@ refresh:
 # Each action takes a list of keys, such as "q", "ctrl+c", "enter", "tab".
 keys:
   quit: [q, ctrl+c]
+  pull: [p]
   refresh: [r]
   up: [k, up]
   down: [j, down]

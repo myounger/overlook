@@ -20,6 +20,7 @@ type styles struct {
 	inSync        lipgloss.Style
 	muted         lipgloss.Style
 	errText       lipgloss.Style
+	success       lipgloss.Style
 	selectedBg    color.Color
 	folder        lipgloss.Style
 	staged        lipgloss.Style
@@ -52,7 +53,8 @@ func newStyles(t config.Theme) styles {
 		upstream:      fg(t.Upstream),
 		inSync:        fg(t.InSync),
 		muted:         fg(t.Muted),
-		errText:       lipgloss.NewStyle().Foreground(lipgloss.Red),
+		errText:       fg(t.Error),
+		success:       fg(t.Success),
 		selectedBg:    colorOf(t.SelectedBg),
 		folder:        fg(t.Folder),
 		staged:        fg(t.Staged),
