@@ -1,0 +1,37 @@
+# Overlook configuration.
+#
+# Print this file with `overlook --default-config`, save it to
+# ~/.config/overlook/config.yml, and change what you like. Any setting you
+# leave out keeps the default shown here.
+
+# Colors take an ANSI color number ("0"-"255") or a hex value ("#7aa2f7").
+# ANSI numbers 0-15 follow your terminal's theme. An empty string ("") means
+# your terminal's default text color.
+theme:
+  border: "8"          # panel borders
+  activeBorder: "2"    # border of the focused panel
+  title: "2"           # panel titles
+  repo: ""             # repository name (always bold)
+  branch: "2"          # branch name
+  worktree: "5"        # worktree marker
+  upstream: "3"        # ahead/behind counts when out of sync
+  inSync: "2"          # check mark when in sync with the remote branch
+  muted: "8"           # secondary text, such as "no upstream"
+
+panels:
+  status:
+    show: true
+    upstream: true     # ahead/behind compared to the remote branch
+    worktree: true     # mark when you're inside a linked worktree
+
+layout:
+  footer: true         # key hints along the bottom
+
+refresh:
+  debounce: 150ms      # wait for a burst of file changes to settle first
+  poll: 10s            # also refresh on this interval as a safety net; 0s turns it off
+
+# Each action takes a list of keys, such as "q", "ctrl+c", "enter", "tab".
+keys:
+  quit: [q, ctrl+c]
+  refresh: [r]
