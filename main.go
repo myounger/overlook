@@ -10,6 +10,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 
+	"github.com/myounger/overlook/internal/claudehook"
 	"github.com/myounger/overlook/internal/config"
 	"github.com/myounger/overlook/internal/git"
 	"github.com/myounger/overlook/internal/ui"
@@ -20,6 +21,9 @@ import (
 var version = "dev"
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "hook" {
+		os.Exit(runHook(os.Args[2:]))
+	}
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, "overlook:", err)
 		os.Exit(1)
@@ -32,7 +36,9 @@ func run() error {
 	printVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Usage = func() {
 		fmt.Fprintln(os.Stderr, "Usage: overlook [flags] [path]")
-		fmt.Fprintln(os.Stderr, "\nShows the git repo at path (default: the current folder).\n\nFlags:")
+		fmt.Fprintln(os.Stderr, "       overlook hook --settings")
+		fmt.Fprintln(os.Stderr, "\nShows the git repo at path (default: the current folder).")
+		fmt.Fprintln(os.Stderr, "`overlook hook --settings` prints the Claude Code hooks that let Overlook\nfollow Claude into worktrees; add them to ~/.claude/settings.json.\n\nFlags:")
 		flag.PrintDefaults()
 	}
 	flag.Parse()
@@ -87,6 +93,36 @@ func run() error {
 		model = model.WithConfigFile(*configPath, cw)
 	}
 
+	// Claude Code hook: watch this repo's folder of session files.
+	if dir, err := claudehook.RepoDir(repo.CommonDir); err == nil && os.MkdirAll(dir, 0o755) == nil {
+		if hw, err := watch.New([]string{dir}, nil, 100*time.Millisecond); err == nil {
+			defer hw.Close()
+			model = model.WithClaudeHook(hw)
+		}
+	}
+
 	_, err = tea.NewProgram(model).Run()
 	return err
+}
+
+// runHook is what Claude Code runs on each hook event (see
+// `overlook hook --settings`). It records where the session is working and
+// always succeeds quietly: a hook must never get in Claude's way.
+func runHook(args []string) int {
+	fs := flag.NewFlagSet("hook", flag.ContinueOnError)
+	settings := fs.Bool("settings", false, "print the hooks to add to ~/.claude/settings.json")
+	if err := fs.Parse(args); err != nil {
+		return 2
+	}
+	if *settings {
+		exe, err := os.Executable()
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "overlook:", err)
+			return 1
+		}
+		fmt.Print(claudehook.Settings(git.CanonicalPath(exe)))
+		return 0
+	}
+	_ = claudehook.Record(os.Stdin, time.Now())
+	return 0
 }

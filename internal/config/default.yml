@@ -91,6 +91,11 @@ worktrees:
   # Switch to whichever worktree has files changing. Off by default so
   # Overlook doesn't jump away from what you're looking at.
   follow: false
+  # Follow Claude Code exactly: switch when a session moves to another
+  # worktree, and mark tabs where a session is working with ✻. Needs the
+  # hook: run `overlook hook --settings` and add what it prints to
+  # ~/.claude/settings.json.
+  followClaude: true
 
 # Pull is Overlook's only write action. It always runs git pull --ff-only,
 # which either fast-forwards your branch to its upstream or refuses and

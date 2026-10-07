@@ -29,6 +29,18 @@ Run `overlook` inside any repo, or `overlook path/to/repo`. Press `r` to refresh
 
 The mouse works too: the wheel scrolls the panel under the pointer, clicking selects (click again to fold a folder or open a diff), and clicking a worktree tab switches to it. Hold Shift (Option in iTerm2) to select text. Set `layout.mouse: false` to turn it off.
 
+## Following Claude Code into worktrees
+
+On its own, Overlook switches to a worktree as soon as it's created. For an exact answer, let Claude Code tell it where each session is working:
+
+```sh
+overlook hook --settings
+```
+
+This prints a `hooks` block. Add it to `~/.claude/settings.json` (merge it into an existing `"hooks"` if you have one). After that, whenever a Claude Code session moves to a different worktree, Overlook switches to it. Worktree tabs show a ✻ where a session is working. If you switch away by hand while Claude keeps working in the same place, Overlook stays where you put it.
+
+The hook only observes. It runs in the background after each tool call, never prints anything, and always succeeds, so it can't slow down or change what Claude does. It records each session's worktree in `~/.local/state/overlook/claude/` and removes the record when the session ends. Set `worktrees.followClaude: false` to stop following without removing the hook.
+
 ## Planned stack
 
 - **Go** - builds to a single binary with no runtime to install. lazygit is also Go, so its source is a useful reference.

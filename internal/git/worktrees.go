@@ -83,13 +83,13 @@ type Activity struct {
 	Fingerprint uint64
 }
 
-// ReadActivity runs git status in the worktree at path.
-func ReadActivity(path string, untracked Untracked) (Activity, error) {
-	out, err := run(path, "status", "--porcelain=v2", "-z", untracked.flag())
+// ReadActivity reads the activity of the worktree r.
+func ReadActivity(r Repo, untracked Untracked) (Activity, error) {
+	s, err := ReadStatus(r, untracked)
 	if err != nil {
 		return Activity{}, err
 	}
-	return ActivityOf(path, parseStatus(out).Files), nil
+	return ActivityOf(r.Root, s.Files), nil
 }
 
 // ActivityOf summarizes an already-read list of changed files. It hashes
