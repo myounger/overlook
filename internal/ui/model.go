@@ -5,6 +5,7 @@ package ui
 import (
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	tea "charm.land/bubbletea/v2"
@@ -37,18 +38,21 @@ type Model struct {
 	files     filesPanel
 	branches  branchesPanel
 	focus     panelID
+	worktrees worktreeSet
+	switching string // worktree path being switched to
 
 	width, height int
 }
 
 func New(cfg config.Config, repo git.Repo, w *watch.Watcher) Model {
 	m := Model{
-		cfg:      cfg,
-		st:       newStyles(cfg.Theme),
-		repo:     repo,
-		watcher:  w,
-		files:    newFilesPanel(cfg.Panels.Files),
-		branches: newBranchesPanel(cfg.Panels.Branches, repo.Root),
+		cfg:       cfg,
+		st:        newStyles(cfg.Theme),
+		repo:      repo,
+		watcher:   w,
+		files:     newFilesPanel(cfg.Panels.Files),
+		branches:  newBranchesPanel(cfg.Panels.Branches, repo.Root),
+		worktrees: newWorktreeSet(cfg.Worktrees),
 	}
 	if shown := m.shownPanels(); len(shown) > 0 {
 		m.focus = shown[0]
@@ -56,14 +60,29 @@ func New(cfg config.Config, repo git.Repo, w *watch.Watcher) Model {
 	return m
 }
 
+// Results carry the worktree root they were read from, so a result that
+// arrives after switching to another worktree is dropped.
 type (
 	statusMsg struct {
-		status git.Status
-		err    error
+		root     string
+		status   git.Status
+		activity git.Activity
+		err      error
 	}
 	branchesMsg struct {
+		root     string
 		branches []git.Branch
 		err      error
+	}
+	worktreesMsg struct {
+		root     string
+		list     []git.Worktree
+		activity map[string]git.Activity
+		err      error
+	}
+	switchedMsg struct {
+		repo git.Repo
+		err  error
 	}
 	changedMsg struct{}
 	pollMsg    struct{}
@@ -77,16 +96,58 @@ func (m Model) load() tea.Cmd {
 	repo, untracked := m.repo, git.Untracked(m.cfg.Panels.Files.Untracked)
 	cmds := []tea.Cmd{func() tea.Msg {
 		s, err := git.ReadStatus(repo, untracked)
-		return statusMsg{s, err}
+		return statusMsg{repo.Root, s, git.ActivityOf(repo.Root, s.Files), err}
 	}}
 	if m.cfg.Panels.Branches.Show {
 		mergedInto := m.cfg.Panels.Branches.MergedInto
 		cmds = append(cmds, func() tea.Msg {
 			b, _, err := git.ReadBranches(repo, mergedInto)
-			return branchesMsg{b, err}
+			return branchesMsg{repo.Root, b, err}
 		})
 	}
+	if m.worktrees.enabled() {
+		needActivity := m.cfg.Worktrees.Counts || m.cfg.Worktrees.Follow
+		cmds = append(cmds, func() tea.Msg { return loadWorktrees(repo, untracked, needActivity) })
+	}
 	return tea.Batch(cmds...)
+}
+
+// loadWorktrees lists the worktrees and, for every one but the active
+// worktree, reads its activity. Those git status calls run in parallel.
+func loadWorktrees(repo git.Repo, untracked git.Untracked, needActivity bool) worktreesMsg {
+	list, err := git.ListWorktrees(repo)
+	msg := worktreesMsg{root: repo.Root, list: list, err: err, activity: map[string]git.Activity{}}
+	if err != nil || !needActivity {
+		return msg
+	}
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	for _, w := range list {
+		if w.Path == repo.Root || w.Prunable {
+			continue
+		}
+		wg.Go(func() {
+			if act, err := git.ReadActivity(w.Path, untracked); err == nil {
+				mu.Lock()
+				msg.activity[w.Path] = act
+				mu.Unlock()
+			}
+		})
+	}
+	wg.Wait()
+	return msg
+}
+
+// switchTo moves Overlook to the worktree at path.
+func (m *Model) switchTo(path string) tea.Cmd {
+	if path == "" || path == m.repo.Root || path == m.switching {
+		return nil
+	}
+	m.switching = path
+	return func() tea.Msg {
+		repo, err := git.Locate(path)
+		return switchedMsg{repo, err}
+	}
 }
 
 func (m Model) waitForChange() tea.Cmd {
@@ -117,13 +178,43 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.FocusMsg:
 		return m, m.load()
 	case statusMsg:
+		if msg.root != m.repo.Root {
+			return m, nil
+		}
 		m.statusErr, m.loaded = msg.err, true
 		if msg.err == nil {
 			m.status = msg.status
 			m.files.setFiles(msg.status.Files)
+			m.worktrees.setActive(msg.root, msg.activity)
 		}
 	case branchesMsg:
+		if msg.root != m.repo.Root {
+			return m, nil
+		}
 		m.branches.setBranches(msg.branches, msg.err)
+	case worktreesMsg:
+		if msg.err != nil || msg.root != m.repo.Root {
+			return m, nil
+		}
+		hadTabs := m.worktrees.showTabs()
+		target := m.worktrees.update(msg.list, msg.activity, m.repo.Root)
+		if m.worktrees.showTabs() != hadTabs {
+			m.layout()
+		}
+		return m, m.switchTo(target)
+	case switchedMsg:
+		m.switching = ""
+		if msg.err != nil {
+			return m, nil
+		}
+		m.repo = msg.repo
+		m.status, m.statusErr, m.loaded = git.Status{}, nil, false
+		files := newFilesPanel(m.cfg.Panels.Files)
+		files.flat = m.files.flat
+		files.setSize(m.files.width, m.files.height)
+		m.files = files
+		m.branches.repoRoot = msg.repo.Root
+		return m, m.load()
 	case changedMsg:
 		return m, tea.Batch(m.load(), m.waitForChange())
 	case pollMsg:
@@ -146,6 +237,10 @@ func (m Model) handleKey(key string) (tea.Model, tea.Cmd) {
 	case is(k.PrevPanel):
 		m.cycleFocus(-1)
 		return m, nil
+	case is(k.NextWorktree):
+		return m, m.switchTo(m.worktrees.neighbor(m.repo.Root, 1))
+	case is(k.PrevWorktree):
+		return m, m.switchTo(m.worktrees.neighbor(m.repo.Root, -1))
 	}
 
 	list := m.focusedList()
@@ -220,6 +315,9 @@ func (m *Model) focusedList() *listView {
 // sharing what's left above the footer in proportion to their sizes.
 func (m *Model) layout() {
 	h := m.height
+	if m.worktrees.showTabs() {
+		h--
+	}
 	if m.cfg.Panels.Status.Show {
 		h -= statusHeight
 	}
@@ -255,6 +353,9 @@ func (m Model) View() tea.View {
 	v.AltScreen = true
 	v.ReportFocus = true
 	v.WindowTitle = "overlook · " + m.repo.Name()
+	if m.repo.IsWorktree() {
+		v.WindowTitle += " ⎇ " + m.repo.WorktreeName()
+	}
 	return v
 }
 
@@ -263,6 +364,9 @@ func (m Model) render() string {
 		return ""
 	}
 	var sections []string
+	if m.worktrees.showTabs() {
+		sections = append(sections, m.worktrees.view(m.st, m.repo.Name(), m.repo.Root, m.width))
+	}
 	if m.cfg.Panels.Status.Show {
 		body := "loading…"
 		if m.loaded {
@@ -298,7 +402,8 @@ func (m Model) render() string {
 }
 
 // footer shows the keys that do something in the focused panel. Moving up
-// and down is left out to save room.
+// and down, and refresh (everything refreshes on its own), are left out to
+// save room.
 func (m Model) footer() string {
 	k := m.cfg.Keys
 	first := func(keys []string) string {
@@ -317,9 +422,14 @@ func (m Model) footer() string {
 		hints = append(hints, hint{first(k.ToggleFolder), "fold"}, hint{first(k.ToggleView), otherView})
 	}
 	if len(m.shownPanels()) > 1 {
-		hints = append(hints, hint{first(k.NextPanel), "switch"})
+		hints = append(hints, hint{first(k.NextPanel), "panel"})
 	}
-	hints = append(hints, hint{first(k.Refresh), "refresh"}, hint{first(k.Quit), "quit"})
+	if m.worktrees.showTabs() {
+		if p, n := first(k.PrevWorktree), first(k.NextWorktree); p != "" && n != "" {
+			hints = append(hints, hint{p + n, "worktree"})
+		}
+	}
+	hints = append(hints, hint{first(k.Quit), "quit"})
 
 	var parts []string
 	for _, h := range hints {

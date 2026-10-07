@@ -32,6 +32,8 @@ type styles struct {
 	currentBranch lipgloss.Style
 	gone          lipgloss.Style
 	merged        lipgloss.Style
+	tab           lipgloss.Style
+	activeTab     lipgloss.Style
 }
 
 func newStyles(t config.Theme) styles {
@@ -59,6 +61,8 @@ func newStyles(t config.Theme) styles {
 		currentBranch: fg(t.CurrentBranch).Bold(true),
 		gone:          fg(t.Gone),
 		merged:        fg(t.Merged),
+		tab:           fg(t.Tab),
+		activeTab:     fg(t.ActiveTab).Bold(true).Background(colorOf(t.SelectedBg)),
 	}
 }
 

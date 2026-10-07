@@ -30,7 +30,7 @@ func Locate(dir string) (Repo, error) {
 	if len(lines) != 3 {
 		return Repo{}, fmt.Errorf("unexpected git rev-parse output: %q", out)
 	}
-	return Repo{Root: lines[0], GitDir: lines[1], CommonDir: lines[2]}, nil
+	return Repo{Root: CanonicalPath(lines[0]), GitDir: CanonicalPath(lines[1]), CommonDir: CanonicalPath(lines[2])}, nil
 }
 
 // IsWorktree reports whether this is a linked worktree rather than the main

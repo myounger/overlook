@@ -29,6 +29,8 @@ theme:
   currentBranch: "2"   # the branch you're on, in the Branches panel
   gone: "1"            # "gone": the branch's remote branch was deleted
   merged: "6"          # "merged": everything on the branch is in the base branch
+  activeTab: "2"       # the worktree tab you're viewing
+  tab: "8"             # the other worktree tabs
 
 panels:
   status:
@@ -53,6 +55,16 @@ panels:
     # else main or master. Squash-merged PRs don't count as merged; they show
     # as "gone" once you fetch with --prune and the remote branch is deleted.
     mergedInto: ""
+
+# Overlook shows one working tree at a time: the main folder or one of its
+# linked worktrees (like the ones Claude Code creates).
+worktrees:
+  tabs: true           # a tab for each one along the top, once there's more than one
+  counts: true         # number of changed files on each tab
+  autoSwitch: true     # switch to a new worktree as soon as it's created
+  # Switch to whichever worktree has files changing. Off by default so
+  # Overlook doesn't jump away from what you're looking at.
+  follow: false
 
 layout:
   footer: true         # key hints along the bottom
@@ -80,3 +92,5 @@ keys:
   toggleView: ["`"]    # switch the Files panel between tree and flat
   nextPanel: [tab]
   prevPanel: [shift+tab]
+  nextWorktree: ["]"]
+  prevWorktree: ["["]

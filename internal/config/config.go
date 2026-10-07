@@ -21,11 +21,12 @@ import (
 var Default []byte
 
 type Config struct {
-	Theme   Theme   `yaml:"theme"`
-	Panels  Panels  `yaml:"panels"`
-	Layout  Layout  `yaml:"layout"`
-	Refresh Refresh `yaml:"refresh"`
-	Keys    Keys    `yaml:"keys"`
+	Theme     Theme     `yaml:"theme"`
+	Panels    Panels    `yaml:"panels"`
+	Worktrees Worktrees `yaml:"worktrees"`
+	Layout    Layout    `yaml:"layout"`
+	Refresh   Refresh   `yaml:"refresh"`
+	Keys      Keys      `yaml:"keys"`
 }
 
 type Theme struct {
@@ -50,6 +51,8 @@ type Theme struct {
 	CurrentBranch string `yaml:"currentBranch"`
 	Gone          string `yaml:"gone"`
 	Merged        string `yaml:"merged"`
+	ActiveTab     string `yaml:"activeTab"`
+	Tab           string `yaml:"tab"`
 }
 
 type Panels struct {
@@ -82,6 +85,13 @@ type BranchesPanel struct {
 	MergedInto string `yaml:"mergedInto"`
 }
 
+type Worktrees struct {
+	Tabs       bool `yaml:"tabs"`
+	Counts     bool `yaml:"counts"`
+	AutoSwitch bool `yaml:"autoSwitch"`
+	Follow     bool `yaml:"follow"`
+}
+
 type Layout struct {
 	Footer bool `yaml:"footer"`
 }
@@ -106,6 +116,8 @@ type Keys struct {
 	ToggleView   []string `yaml:"toggleView"`
 	NextPanel    []string `yaml:"nextPanel"`
 	PrevPanel    []string `yaml:"prevPanel"`
+	NextWorktree []string `yaml:"nextWorktree"`
+	PrevWorktree []string `yaml:"prevWorktree"`
 }
 
 // Path returns the config file location: $XDG_CONFIG_HOME/overlook/config.yml,
