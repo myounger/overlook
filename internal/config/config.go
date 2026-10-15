@@ -28,6 +28,7 @@ type Config struct {
 	Pull      Pull      `yaml:"pull"`
 	Layout    Layout    `yaml:"layout"`
 	Refresh   Refresh   `yaml:"refresh"`
+	Split     Split     `yaml:"split"`
 	Keys      Keys      `yaml:"keys"`
 }
 
@@ -145,6 +146,10 @@ type Refresh struct {
 	Poll     time.Duration `yaml:"poll"`
 }
 
+type Split struct {
+	Width int `yaml:"width"`
+}
+
 type Keys struct {
 	Quit         []string `yaml:"quit"`
 	Pull         []string `yaml:"pull"`
@@ -242,6 +247,7 @@ func (c Config) validate() error {
 		atLeast1("panels.diff.maxLines", c.Panels.Diff.MaxLines),
 		atLeast1("panels.log.size", c.Panels.Log.Size),
 		between("panels.log.count", c.Panels.Log.Count, 1, 1000),
+		between("split.width", c.Split.Width, 20, 80),
 	)
 }
 

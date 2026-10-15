@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -71,5 +72,17 @@ func TestErrorsArePlain(t *testing.T) {
 		if err == nil || err.Error() != path+": "+want {
 			t.Errorf("%q:\n got %v\nwant %s: %s", body, err, path, want)
 		}
+	}
+}
+
+func TestLoadSplitWidth(t *testing.T) {
+	cfg, err := Load(filepath.Join(t.TempDir(), "nope.yml"))
+	if err != nil || cfg.Split.Width != 35 {
+		t.Fatalf("default split.width = %d, %v; want 35", cfg.Split.Width, err)
+	}
+	path := filepath.Join(t.TempDir(), "config.yml")
+	os.WriteFile(path, []byte("split:\n  width: 95\n"), 0o644)
+	if _, err := Load(path); err == nil || !strings.Contains(err.Error(), "split.width is 95; use 20 to 80") {
+		t.Errorf("got %v, want a split.width range error", err)
 	}
 }
