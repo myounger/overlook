@@ -43,9 +43,15 @@ homebrew_casks:
     license: MIT
     # The binary isn't signed by Apple, and casks are downloaded with the
     # quarantine flag set, so macOS would refuse to run it. Clear the flag.
-    hooks:
-      post:
-        install: |
-          if OS.mac?
-            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/overlook"]
-          end
+    #
+    # This would be hooks.post.install, but that writes a `postflight`
+    # block, which Homebrew 7 deprecated (issue #6). Its replacement,
+    # hooks.post.install_steps, arrives in GoReleaser v2.19; until then the
+    # block goes in by hand. {{ "{{staged_path}}" }} keeps GoReleaser from
+    # reading Homebrew's {{staged_path}} as one of its own templates.
+    custom_block: |
+      postflight_steps do
+        on_macos do
+          run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ "{{staged_path}}" }}/overlook"]
+        end
+      end
