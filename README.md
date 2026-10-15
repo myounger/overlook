@@ -87,6 +87,16 @@ Run `overlook` inside a repo, or `overlook path/to/repo`.
 
 The mouse works too: the wheel scrolls the panel under the pointer, clicking a row selects it (click again to fold a folder or open a diff), and clicking a worktree tab switches to it. Hold Shift (Option in iTerm2) to select text, or set `layout.mouse: false` to turn the mouse off.
 
+### In a herdr pane
+
+If you work in [herdr](https://herdr.dev), the terminal multiplexer for coding agents, run this from any herdr pane. In Claude Code's pane, type it after a `!` at the prompt.
+
+```sh
+overlook --split            # or: overlook --split path/to/repo
+```
+
+It opens Overlook in a new pane to the right, 35% of the width, and leaves you in the pane you were in. Set `split.width` to change the share. Outside herdr, `--split` says so and does nothing.
+
 ## Following Claude Code
 
 On its own, Overlook switches to a worktree as soon as one appears. For an exact answer, let Claude Code tell it which worktree each session is working in:

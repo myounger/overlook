@@ -13,6 +13,7 @@ import (
 	"github.com/myounger/overlook/internal/claudehook"
 	"github.com/myounger/overlook/internal/config"
 	"github.com/myounger/overlook/internal/git"
+	"github.com/myounger/overlook/internal/herdr"
 	"github.com/myounger/overlook/internal/ui"
 	"github.com/myounger/overlook/internal/watch"
 )
@@ -34,10 +35,11 @@ func run() error {
 	configPath := flag.String("config", "", "config file (default ~/.config/overlook/config.yml)")
 	printDefault := flag.Bool("default-config", false, "print the default config and exit")
 	printVersion := flag.Bool("version", false, "print the version and exit")
+	split := flag.Bool("split", false, "open Overlook in a new herdr pane to the right, without focus, and exit")
 	flag.Usage = func() {
 		fmt.Fprintln(os.Stderr, "Usage: overlook [flags] [path]")
 		fmt.Fprintln(os.Stderr, "       overlook hook --settings")
-		fmt.Fprintln(os.Stderr, "\nShows the git repo at path (default: the current folder).")
+		fmt.Fprintln(os.Stderr, "\nShows the git repo at path (default: the current folder). In herdr, --split\nopens it in a pane next to the one you're in.")
 		fmt.Fprintln(os.Stderr, "`overlook hook --settings` prints the Claude Code hooks that let Overlook\nfollow Claude into worktrees; add them to ~/.claude/settings.json.\n\nFlags:")
 		flag.PrintDefaults()
 	}
@@ -72,6 +74,11 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	// Checking the config and repo first means a mistake is reported here,
+	// not in a new pane.
+	if *split {
+		return runSplit(cfg, *configPath, dir)
+	}
 
 	// HEAD lives in this worktree's git dir; branch and remote refs, and the
 	// list of linked worktrees, live in the shared one.
@@ -103,6 +110,29 @@ func run() error {
 
 	_, err = tea.NewProgram(model).Run()
 	return err
+}
+
+// runSplit opens a herdr pane to the right in dir and starts this same
+// binary in it, passing along --config if it was given.
+func runSplit(cfg config.Config, configPath, dir string) error {
+	exe, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	command := []string{exe}
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "config" {
+			command = append(command, "--config", absPath(configPath))
+		}
+	})
+	return herdr.FromEnviron().Split(cfg.Split.Width, absPath(dir), command...)
+}
+
+func absPath(p string) string {
+	if abs, err := filepath.Abs(p); err == nil {
+		return abs
+	}
+	return p
 }
 
 // runHook is what Claude Code runs on each hook event (see
