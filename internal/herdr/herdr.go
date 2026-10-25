@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"runtime"
 	"strings"
 )
 
@@ -25,6 +26,7 @@ type Env struct {
 	Bin       string // the herdr binary
 	InHerdr   bool   // HERDR_ENV is set: we're in a herdr pane
 	Installed bool   // Bin can be found
+	OS        string // runtime.GOOS, for guessing a pane's shell when herdr can't say
 }
 
 // FromEnviron reads the variables herdr sets in each of its panes.
@@ -39,6 +41,7 @@ func FromEnviron() Env {
 		Bin:       bin,
 		InHerdr:   os.Getenv("HERDR_ENV") != "",
 		Installed: err == nil,
+		OS:        runtime.GOOS,
 	}
 }
 
@@ -50,7 +53,9 @@ var (
 // Split opens a pane to the right of the current one, in dir, without
 // moving focus, taking width percent of the space, and runs command in it.
 // herdr's --ratio is the share the original pane keeps, so it gets
-// 100 - width. If the command can't be started, the new pane is closed.
+// 100 - width. herdr types the command into the new pane's shell, so it's
+// quoted for whichever shell that is. If the command can't be started, the
+// new pane is closed.
 func (e Env) Split(width int, dir string, command ...string) error {
 	switch {
 	case !e.InHerdr && !e.Installed:
@@ -70,7 +75,8 @@ func (e Env) Split(width int, dir string, command ...string) error {
 	if p.Pane.PaneID == "" {
 		return errors.New("herdr pane split returned no pane id")
 	}
-	if err := e.call(nil, "pane", "run", p.Pane.PaneID, shellJoin(command)); err != nil {
+	line := shellJoin(e.paneShell(p.Pane.PaneID), command)
+	if err := e.call(nil, "pane", "run", p.Pane.PaneID, line); err != nil {
 		_ = e.call(nil, "pane", "close", p.Pane.PaneID)
 		return err
 	}
@@ -105,20 +111,100 @@ func (e Env) call(out any, args ...string) error {
 	return json.Unmarshal(resp.Result, out)
 }
 
-var shellSafe = regexp.MustCompile(`^[A-Za-z0-9_@%+=:,./-]+$`)
+// Shell is the family of shell a pane runs, which decides how a command
+// line typed into it has to be quoted.
+type Shell int
 
-// shellJoin builds a command line for the pane's shell, since herdr types
-// the command in rather than running it directly. Anything beyond plain
-// path characters is single-quoted, which bash, zsh and fish all read the
-// same way.
-func shellJoin(args []string) string {
-	quoted := make([]string, len(args))
-	for i, a := range args {
-		if shellSafe.MatchString(a) {
-			quoted[i] = a
-		} else {
-			quoted[i] = "'" + strings.ReplaceAll(a, "'", `'\''`) + "'"
+const (
+	POSIX      Shell = iota // sh, bash, zsh, fish
+	PowerShell              // Windows PowerShell and pwsh
+	Cmd                     // cmd.exe
+)
+
+// paneShell asks herdr which shell the pane is running. If herdr can't say
+// or it's a shell we don't know, it falls back to herdr's default for the
+// OS: PowerShell on Windows, a POSIX shell everywhere else.
+func (e Env) paneShell(pane string) Shell {
+	var p struct {
+		ProcessInfo struct {
+			ShellPID  int `json:"shell_pid"`
+			Processes []struct {
+				PID  int    `json:"pid"`
+				Name string `json:"name"`
+			} `json:"foreground_processes"`
+		} `json:"process_info"`
+	}
+	if e.call(&p, "pane", "process-info", "--pane", pane) == nil {
+		for _, proc := range p.ProcessInfo.Processes {
+			if proc.PID != p.ProcessInfo.ShellPID {
+				continue
+			}
+			if sh, ok := shellNamed(proc.Name); ok {
+				return sh
+			}
 		}
 	}
-	return strings.Join(quoted, " ")
+	if e.OS == "windows" {
+		return PowerShell
+	}
+	return POSIX
+}
+
+// shellNamed recognises a shell from its process name or path, e.g.
+// "pwsh.exe" or "/bin/zsh".
+func shellNamed(name string) (Shell, bool) {
+	name = strings.ToLower(name[strings.LastIndexAny(name, `/\`)+1:])
+	switch strings.TrimSuffix(name, ".exe") {
+	case "sh", "bash", "zsh", "fish", "dash", "ksh":
+		return POSIX, true
+	case "powershell", "pwsh":
+		return PowerShell, true
+	case "cmd":
+		return Cmd, true
+	}
+	return POSIX, false
+}
+
+var (
+	shellSafe   = regexp.MustCompile(`^[A-Za-z0-9_@%+=:,./-]+$`)
+	windowsSafe = regexp.MustCompile(`^[A-Za-z0-9_:./\\-]+$`)
+)
+
+// shellJoin builds a command line for the pane's shell, since herdr types
+// the command in rather than running it directly. Plain path characters are
+// left alone and anything else is quoted:
+//   - POSIX shells: single quotes, which bash, zsh and fish read the same way.
+//   - PowerShell: single quotes too, but a quoted string on its own is just a
+//     value there, so the line starts with the call operator, &.
+//   - cmd: double quotes. Windows paths can't contain a double quote, so
+//     there's nothing to escape inside them.
+func shellJoin(sh Shell, args []string) string {
+	quoted := make([]string, len(args))
+	for i, a := range args {
+		quoted[i] = quoteArg(sh, a)
+	}
+	line := strings.Join(quoted, " ")
+	if sh == PowerShell {
+		return "& " + line
+	}
+	return line
+}
+
+func quoteArg(sh Shell, a string) string {
+	switch sh {
+	case PowerShell:
+		if windowsSafe.MatchString(a) {
+			return a
+		}
+		return "'" + strings.ReplaceAll(a, "'", "''") + "'"
+	case Cmd:
+		if windowsSafe.MatchString(a) {
+			return a
+		}
+		return `"` + a + `"`
+	}
+	if shellSafe.MatchString(a) {
+		return a
+	}
+	return "'" + strings.ReplaceAll(a, "'", `'\''`) + "'"
 }
