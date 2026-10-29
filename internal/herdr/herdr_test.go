@@ -9,7 +9,8 @@ import (
 )
 
 // fakeHerdr records each call and answers from replies, keyed by the
-// first two arguments ("pane split").
+// first two arguments ("pane split", "do pane.split") or the only one
+// ("ls").
 type fakeHerdr struct {
 	calls   [][]string
 	replies map[string]string
@@ -18,7 +19,7 @@ type fakeHerdr struct {
 
 func (f *fakeHerdr) run(name string, args ...string) ([]byte, error) {
 	f.calls = append(f.calls, append([]string{name}, args...))
-	key := strings.Join(args[:2], " ")
+	key := strings.Join(args[:min(2, len(args))], " ")
 	if f.fail[key] {
 		return []byte(f.replies[key]), errors.New("exit status 1")
 	}
@@ -35,7 +36,65 @@ func newFake() (*fakeHerdr, Env) {
 		},
 		fail: map[string]bool{},
 	}
-	return f, Env{Run: f.run, Bin: "herdr", InHerdr: true, Installed: true, OS: "darwin"}
+	return f, Env{Run: f.run, Bin: "herdr", App: "herdr-app", InHerdr: true, Installed: true, OS: "darwin"}
+}
+
+// newAppFake is newFake inside the Herdr app: terminal t5, in pane pB.
+func newAppFake() (*fakeHerdr, Env) {
+	f, env := newFake()
+	f.replies["ls"] = `{"spaces":[{"id":"sp1","tabs":[{"id":"tb1","terminals":[
+ {"terminal":"t1","pane":"pA"},
+ {"terminal":"t5","pane":"pB"}]}]}]}`
+	f.replies["do pane.split"] = `{"pane":"pC","terminal":"t8"}`
+	f.replies["do pane.focus"] = `{"ok":true}`
+	env.InHerdr, env.Terminal = false, "t5"
+	return f, env
+}
+
+func TestAppSplitOpensPaneAndKeepsFocus(t *testing.T) {
+	f, env := newAppFake()
+	if err := env.Split(35, "/repo", "/usr/local/bin/overlook", "--config", "/my config.yml", "/repo"); err != nil {
+		t.Fatal(err)
+	}
+	want := [][]string{
+		{"herdr-app", "ls"},
+		{"herdr-app", "do", "pane.split", `{"argv":["/usr/local/bin/overlook","--config","/my config.yml","/repo"],"direction":"right","pane":"pB"}`},
+		{"herdr-app", "do", "pane.focus", `{"pane":"pB"}`},
+	}
+	if !slices.EqualFunc(f.calls, want, slices.Equal) {
+		t.Errorf("calls:\n%q\nwant:\n%q", f.calls, want)
+	}
+}
+
+func TestAppSplitReportsTheAppsMessage(t *testing.T) {
+	f, env := newAppFake()
+	f.replies["do pane.split"] = `{"error":"no such pane"}`
+	f.fail["do pane.split"] = true
+	if err := env.Split(35, "/repo", "overlook"); err == nil || err.Error() != "herdr-app pane.split: no such pane" {
+		t.Errorf("got %v", err)
+	}
+
+	f, env = newAppFake()
+	env.Terminal = "t9"
+	if err := env.Split(35, "/repo", "overlook"); err == nil || err.Error() != "terminal t9 has no pane in the Herdr window" {
+		t.Errorf("got %v", err)
+	}
+	if len(f.calls) != 1 {
+		t.Errorf("split anyway: %q", f.calls)
+	}
+}
+
+// A herdr pane inside an app terminal sees both variables; the herdr pane
+// is where the person is.
+func TestSplitPrefersHerdrInsideTheApp(t *testing.T) {
+	f, env := newFake()
+	env.Terminal = "t5"
+	if err := env.Split(35, "/repo", "overlook"); err != nil {
+		t.Fatal(err)
+	}
+	if f.calls[0][0] != "herdr" {
+		t.Errorf("first call %q, want herdr", f.calls[0])
+	}
 }
 
 // processInfo is herdr 0.9.5's reply to `pane process-info` for a pane
