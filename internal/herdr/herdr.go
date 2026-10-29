@@ -1,6 +1,9 @@
 // Package herdr opens Overlook in a pane of its own when it's run inside
 // herdr, the terminal multiplexer for coding agents (`overlook --split`).
-// Written against herdr 0.9.5.
+// It works with both herdrs: the terminal UI (written against herdr 0.9.5),
+// which sets HERDR_ENV in its panes, and the Herdr app, which runs its
+// terminals in herdr-core, sets HC_TERMINAL_ID, and arranges them with
+// `herdr-app`.
 package herdr
 
 import (
@@ -24,8 +27,10 @@ func execCommand(name string, args ...string) ([]byte, error) {
 type Env struct {
 	Run       Runner
 	Bin       string // the herdr binary
+	App       string // the herdr-app binary
 	InHerdr   bool   // HERDR_ENV is set: we're in a herdr pane
-	Installed bool   // Bin can be found
+	Terminal  string // HC_TERMINAL_ID: our terminal, when we're in the Herdr app
+	Installed bool   // Bin or App can be found
 	OS        string // runtime.GOOS, for guessing a pane's shell when herdr can't say
 }
 
@@ -35,12 +40,15 @@ func FromEnviron() Env {
 	if bin == "" {
 		bin = "herdr"
 	}
-	_, err := exec.LookPath(bin)
+	_, errBin := exec.LookPath(bin)
+	_, errApp := exec.LookPath("herdr-app")
 	return Env{
 		Run:       execCommand,
 		Bin:       bin,
+		App:       "herdr-app",
 		InHerdr:   os.Getenv("HERDR_ENV") != "",
-		Installed: err == nil,
+		Terminal:  os.Getenv("HC_TERMINAL_ID"),
+		Installed: errBin == nil || errApp == nil,
 		OS:        runtime.GOOS,
 	}
 }
@@ -56,8 +64,13 @@ var (
 // 100 - width. herdr types the command into the new pane's shell, so it's
 // quoted for whichever shell that is. If the command can't be started, the
 // new pane is closed.
+//
+// In the Herdr app it's appSplit instead. A herdr pane inside an app
+// terminal has both variables set; the herdr pane is the nearer one.
 func (e Env) Split(width int, dir string, command ...string) error {
 	switch {
+	case !e.InHerdr && e.Terminal != "":
+		return e.appSplit(command)
 	case !e.InHerdr && !e.Installed:
 		return ErrNotInstalled
 	case !e.InHerdr:
@@ -83,6 +96,80 @@ func (e Env) Split(width int, dir string, command ...string) error {
 	return nil
 }
 
+// appSplit opens a pane to the right of ours in the Herdr app, running
+// command, and puts focus back on ours. The app starts the program itself,
+// so nothing is quoted. Its pane.split takes neither a size nor a folder:
+// the app picks the width, and command has to name the repo.
+func (e Env) appSplit(command []string) error {
+	pane, err := e.paneOf(e.Terminal)
+	if err != nil {
+		return err
+	}
+	if err := e.app("pane.split", map[string]any{"direction": "right", "pane": pane, "argv": command}); err != nil {
+		return err
+	}
+	return e.app("pane.focus", map[string]any{"pane": pane})
+}
+
+// paneOf finds the pane showing terminal in `herdr-app ls`.
+func (e Env) paneOf(terminal string) (string, error) {
+	data, err := e.Run(e.App, "ls")
+	if err != nil {
+		return "", commandFailed("herdr-app ls", err, data)
+	}
+	var ls struct {
+		Spaces []struct {
+			Tabs []struct {
+				Terminals []struct {
+					Terminal string `json:"terminal"`
+					Pane     string `json:"pane"`
+				} `json:"terminals"`
+			} `json:"tabs"`
+		} `json:"spaces"`
+	}
+	if err := json.Unmarshal(data, &ls); err != nil {
+		return "", fmt.Errorf("herdr-app ls: unexpected reply %q", strings.TrimSpace(string(data)))
+	}
+	for _, s := range ls.Spaces {
+		for _, t := range s.Tabs {
+			for _, p := range t.Terminals {
+				if p.Terminal == terminal && p.Pane != "" {
+					return p.Pane, nil
+				}
+			}
+		}
+	}
+	return "", fmt.Errorf("terminal %s has no pane in the Herdr window", terminal)
+}
+
+// app runs a herdr-app command with its arguments as one JSON object.
+// herdr-app prints {"error": "..."} when it refuses.
+func (e Env) app(command string, args map[string]any) error {
+	params, err := json.Marshal(args)
+	if err != nil {
+		return err
+	}
+	data, err := e.Run(e.App, "do", command, string(params))
+	var resp struct {
+		Error string `json:"error"`
+	}
+	if jerr := json.Unmarshal(data, &resp); jerr == nil && resp.Error != "" {
+		return fmt.Errorf("herdr-app %s: %s", command, resp.Error)
+	}
+	if err != nil {
+		return commandFailed("herdr-app "+command, err, data)
+	}
+	return nil
+}
+
+// commandFailed describes a command that exited badly, with what it printed.
+func commandFailed(what string, err error, out []byte) error {
+	if text := strings.TrimSpace(string(out)); text != "" {
+		return fmt.Errorf("%s: %v: %s", what, err, text)
+	}
+	return fmt.Errorf("%s: %v", what, err)
+}
+
 // call runs a herdr subcommand and decodes .result into out. herdr prints
 // {"error": {"code", "message"}} when it refuses; that message is the error.
 func (e Env) call(out any, args ...string) error {
@@ -99,10 +186,7 @@ func (e Env) call(out any, args ...string) error {
 	case jerr == nil && resp.Error != nil:
 		return fmt.Errorf("%s: %s", what, resp.Error.Message)
 	case err != nil:
-		if text := strings.TrimSpace(string(data)); text != "" {
-			return fmt.Errorf("%s: %v: %s", what, err, text)
-		}
-		return fmt.Errorf("%s: %v", what, err)
+		return commandFailed(what, err, data)
 	case out == nil:
 		return nil
 	case jerr != nil || len(resp.Result) == 0:

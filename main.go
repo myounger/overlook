@@ -113,7 +113,8 @@ func run() error {
 }
 
 // runSplit opens a herdr pane to the right in dir and starts this same
-// binary in it, passing along --config if it was given.
+// binary in it, passing along --config if it was given. The command names
+// dir too: the Herdr app can't start a pane in a folder.
 func runSplit(cfg config.Config, configPath, dir string) error {
 	exe, err := os.Executable()
 	if err != nil {
@@ -125,6 +126,7 @@ func runSplit(cfg config.Config, configPath, dir string) error {
 			command = append(command, "--config", absPath(configPath))
 		}
 	})
+	command = append(command, absPath(dir))
 	return herdr.FromEnviron().Split(cfg.Split.Width, absPath(dir), command...)
 }
 

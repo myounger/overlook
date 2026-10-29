@@ -141,7 +141,7 @@ refresh:
 # coding agents), opens Overlook in a new pane to its right and leaves you
 # where you were.
 split:
-  width: 35            # percent of the pane's width for Overlook
+  width: 35            # percent of the pane's width for Overlook (the Herdr app picks its own)
 
 # Each action takes a list of keys, such as "q", "ctrl+c", "enter", "tab".
 keys:

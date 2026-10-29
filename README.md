@@ -89,13 +89,13 @@ The mouse works too: the wheel scrolls the panel under the pointer, clicking a r
 
 ### In a herdr pane
 
-If you work in [herdr](https://herdr.dev), the terminal multiplexer for coding agents, run this from any herdr pane. In Claude Code's pane, type it after a `!` at the prompt.
+If you work in [herdr](https://herdr.dev), the terminal multiplexer for coding agents, run this from any herdr pane, in either the terminal UI or the Herdr app. In Claude Code's pane, type it after a `!` at the prompt.
 
 ```sh
 overlook --split            # or: overlook --split path/to/repo
 ```
 
-It opens Overlook in a new pane to the right, 35% of the width, and leaves you in the pane you were in. Set `split.width` to change the share. Outside herdr, `--split` says so and does nothing.
+It opens Overlook in a new pane to the right and leaves you in the pane you were in. In the terminal UI it takes 35% of the width; set `split.width` to change the share. The Herdr app has no way to size a new pane, so there it gets the app's default width and `split.width` is ignored. Outside herdr, `--split` says so and does nothing.
 
 ## Following Claude Code
 
